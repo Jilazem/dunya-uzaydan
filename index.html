@@ -46,12 +46,13 @@ canvas { display: block; }
 </div>
 <div id="ui">
   <h1>🌍 Dünya — Uzaydan Görünüm</h1>
-  <p>Sürükle: döndür &nbsp;|&nbsp; Scroll: yakınlaş &nbsp;|&nbsp; R tuşu: sıfırla</p>
+  <p>Sürükle: döndür &nbsp;|&nbsp; Scroll: yakınlaş &nbsp;|&nbsp; R: sıfırla &nbsp;|&nbsp; G: Güneş kurgusu</p>
 </div>
 <div id="info">
   Yörünge yüksekliği: ~400 km (ISS)<br>
   Doku: NASA — three.js örnek kütüphanesi<br>
-  Güneş ve Ay: sahne için ölçek küçültülmüş
+  Güneş ve Ay: ölçek/yörünge sahneye sığdırıldı (gerçekleri çok uzak)<br>
+  G: gündüz ↔ Güneş kadrajda &nbsp; R: sıfırla
 </div>
 <div id="crosshair"></div>
 
@@ -194,7 +195,12 @@ const moonTex   = loaderT.load(BASE + 'moon_1024.jpg', srgb);            // Ay y
 const earthGroup = new THREE.Group();
 scene.add(earthGroup);
 
-const sunPos = new THREE.Vector3(1, 0.25, 0.45).normalize().multiplyScalar(120);
+// FIZIK: Ayni karede tam aydinlik Dunya + Gunes diski imkansiz (ISS gercekli —
+// Gunes'i goruyorsan Dunya sirtindan aydinlanir, hilal/karanlik gorunur).
+// Iki kurgu, G tusuyla gecis:
+const FICAN_A = new THREE.Vector3(0.8, 0.2, 0.55).normalize().multiplyScalar(130);  // aydinlik Dunya, Gunes kadraj disinda
+const FICAN_B = new THREE.Vector3(0.42, 0.12, -0.91).normalize().multiplyScalar(130); // Gunes kadrajda, Dunya hilal + sehir isiklari
+const sunPos = FICAN_A.clone();
 
 const earthGeo = new THREE.SphereGeometry(1, 128, 64);
 const earthMat = new THREE.MeshPhongMaterial({
@@ -260,18 +266,16 @@ const clouds = new THREE.Mesh(new THREE.SphereGeometry(1.008, 64, 32), cloudMat)
 earthGroup.add(clouds);
 
 // ─── Güneş ───────────────────────────────────────────────
-// Işık kaynağı güneşin gerçek konumundan gelir (Dünya + Ay + bulutlar aynı kaynaktan aydınlanır)
+// Isik kaynagi gunesin gercek konumundan gelir (Dunya + Ay + bulutlar ayni kaynaktan aydinlanir)
 const sunLight = new THREE.DirectionalLight(0xfff5e6, 2.6);
-sunLight.position.copy(sunPos);
 scene.add(sunLight);
-scene.add(new THREE.AmbientLight(0x0a1020, 0.35)); // gece tarafı çok siyah kalmasın
+scene.add(new THREE.AmbientLight(0x0a1020, 0.35)); // gece tarafi cok siyah kalmasin
 
-// Güneş diski + parlaması
+// Gunes diski + parlamasi
 const sunMesh = new THREE.Mesh(
   new THREE.SphereGeometry(4.5, 32, 16),
   new THREE.MeshBasicMaterial({ color: 0xffee99 })
 );
-sunMesh.position.copy(sunPos);
 scene.add(sunMesh);
 
 function glowSprite() {
@@ -291,25 +295,24 @@ function glowSprite() {
   });
   const sp = new THREE.Sprite(mat);
   sp.scale.set(45, 45, 1);
-  sp.position.copy(sunPos);
   return sp;
 }
-scene.add(glowSprite());
+const sunGlow = glowSprite();
+scene.add(sunGlow);
 
 // ─── Ay ──────────────────────────────────────────────────
-// Gerçek yarıçap oranı ~0.27; yörünge yarıçapı 60 Dünya yarıçapı olurdu ama
-// görünsün diye sahneye sığdırıldı (yazılı uyarı #info panelinde).
+// Gercek yari cap orani ~0.27 dogru; gercek yorunge (60 Dünya yari capi) ekrana
+// sigmaz — gosteri icin yaklastirildi (uyari #info'da). Ay, Dunya'nin sol-ustune
+// konar; pivot y ekseninde donerek gokyuzunde dolasir (Dunya'nin ardamdan gizlenir, onunden gecer).
 const moonPivot = new THREE.Group();
-moonPivot.rotation.z = 0.14; // yörünge eğikliği
 scene.add(moonPivot);
 
 const moon = new THREE.Mesh(
-  new THREE.SphereGeometry(0.27, 64, 32),
+  new THREE.SphereGeometry(0.3, 64, 32),
   new THREE.MeshStandardMaterial({ map: moonTex, roughness: 1, metalness: 0 })
 );
-moon.position.set(7, 0, 0);
+moon.position.set(-2.4, 1.7, 0);
 moonPivot.add(moon);
-// Ay pivotun çocuğu: aynı yüzü hep Dünya'ya bakar (gerçek gelgit kilidi gibi)
 
 // ─── ISS pencere çerçevesi ───────────────────────────────
 const windowFrame = new THREE.Group();
@@ -335,12 +338,27 @@ windowFrame.add(bar2);
 camera.position.set(0, 0, 4.2);
 controls.target.set(0, 0, 0);
 
-// ─── R efekti ────────────────────────────────────────────
+// ─── R / G efektleri ─────────────────────────────────────
+function sunUygula(v) {
+  sunPos.copy(v);
+  sunLight.position.copy(v);
+  sunMesh.position.copy(v);
+  sunGlow.position.copy(v);
+  atmosMat.uniforms.sunDir.value.copy(v).normalize();
+}
+let guncel = 'A';
+sunUygula(FICAN_A); // baslangic: aydinlik Dunya
+if (location.search.includes('sun=B')) { guncel = 'B'; sunUygula(FICAN_B); }
+
 window.addEventListener('keydown', e => {
   if(e.key === 'r' || e.key === 'R') {
     camera.position.set(0, 0, 4.2);
     controls.target.set(0, 0, 0);
     controls.update();
+  }
+  if(e.key === 'g' || e.key === 'G') { // kurgu gecisi: aydinlik Dunya <-> Gunes kadrajda
+    guncel = guncel === 'A' ? 'B' : 'A';
+    sunUygula(guncel === 'A' ? FICAN_A : FICAN_B);
   }
 });
 
