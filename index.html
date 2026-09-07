@@ -6,384 +6,536 @@
 <title>Astronot Gözünden Dünya 🌍</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+body { overflow: hidden; background: #000; font-family: 'Segoe UI', system-ui, sans-serif; }
 canvas { display: block; }
-#ui {
-  position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-  color: #8cf; text-align: center; pointer-events: none; user-select: none;
-  text-shadow: 0 0 10px #0af, 0 0 20px #06f;
-}
-#ui h1 { font-size: 18px; letter-spacing: 4px; text-transform: uppercase; opacity: 0.9; }
-#ui p { font-size: 12px; opacity: 0.6; margin-top: 4px; }
-#info {
-  position: absolute; bottom: 20px; left: 20px;
-  color: #6a9; font-size: 11px; pointer-events: none;
-  line-height: 1.6;
-}
-#crosshair {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-  width: 40px; height: 40px; pointer-events: none; opacity: 0.3;
-}
-#crosshair::before, #crosshair::after {
-  content: ''; position: absolute; background: #8cf;
-}
-#crosshair::before { width: 20px; height: 1px; top: 19px; left: 10px; }
-#crosshair::after { width: 1px; height: 20px; left: 19px; top: 10px; }
-#loader {
-  position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 14px;
-  background: #000; z-index: 10; transition: opacity 0.8s;
-  color: #8cf; font-size: 13px; letter-spacing: 3px;
-}
-#barDis { width: 260px; height: 3px; background: #123; border-radius: 2px; overflow: hidden; }
-#bar { width: 0%; height: 100%; background: linear-gradient(90deg,#06f,#8cf); }
+#ui { position: absolute; top: 16px; left: 16px; color: #fff; z-index: 10; pointer-events: none; }
+#ui h1 { font-size: 17px; font-weight: 300; letter-spacing: 3px; text-shadow: 0 0 16px rgba(80,160,255,.6); margin-bottom: 3px; }
+#ui p { font-size: 10px; opacity: .55; letter-spacing: 1px; }
+#info { position: absolute; bottom: 52px; left: 16px; color: rgba(140,220,170,.85); font-size: 9.5px; line-height: 1.7; letter-spacing: .4px; text-shadow: 0 1px 3px #000; z-index: 10; pointer-events: none; }
+/* Nişangah: çok soluk — sinematik havayı bozmasın (rötuş) */
+#crosshair { position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: .16; }
+#crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,.85); }
+#crosshair::before { left: 50%; top: 0; bottom: 0; width: 1px; transform: translateX(-50%); }
+#crosshair::after { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-50%); }
+#ring { position: fixed; left: 50%; top: 50%; width: 52vmin; height: 52vmin; border: 1px solid rgba(255,255,255,.45); border-radius: 50%; transform: translate(-50%,-50%); pointer-events: none; z-index: 5; }
+#ring::before, #ring::after, #ring .t, #ring .b { content: ''; position: absolute; width: 14px; height: 1px; background: rgba(255,255,255,.6); left: 50%; margin-left: -7px; }
+#ring::before { top: -7px; } #ring::after { bottom: -7px; }
+#ring .t { top: 7px; } #ring .b { bottom: 7px; }
+
+/* Saat çubuğu */
+#timebar { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 12; display: flex; gap: 6px; align-items: center; background: rgba(8,14,28,.82); border: 1px solid rgba(120,170,255,.25); border-radius: 10px; padding: 7px 10px; }
+#clock { color: #cfe4ff; font-size: 11px; letter-spacing: .5px; margin-right: 4px; min-width: 118px; }
+.tbtn { background: rgba(90,140,255,.14); border: 1px solid rgba(130,175,255,.35); color: #dbe9ff; font-size: 11px; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+.tbtn:hover { background: rgba(90,140,255,.32); }
+.tbtn.on { background: rgba(90,180,120,.35); border-color: rgba(140,230,160,.6); }
+
+/* Katman paneli */
+#panel { position: absolute; top: 84px; right: 12px; width: 216px; z-index: 12; background: rgba(8,14,28,.85); border: 1px solid rgba(120,170,255,.22); border-radius: 12px; padding: 10px 12px; color: #d9e8ff; font-size: 11px; max-height: calc(100vh - 160px); overflow-y: auto; overflow-x: hidden; }
+#panel h2 { font-size: 10px; letter-spacing: 1.5px; color: #8fb6e8; font-weight: 500; margin: 6px 0 4px; }
+#panel label { display: flex; align-items: center; gap: 7px; padding: 2.5px 0; cursor: pointer; }
+#panel input[type=checkbox] { accent-color: #6ea8ff; }
+#go { width: 100%; display: flex; gap: 6px; margin-top: 2px; }
+#q { flex: 1; background: rgba(255,255,255,.9); border: none; border-radius: 6px; padding: 5px 8px; font-size: 11px; color: #111; }
+#wx { margin-top: 8px; border-top: 1px solid rgba(120,170,255,.2); padding-top: 7px; display: none; line-height: 1.65; font-size: 10.5px; }
+#wx b { color: #ffe9a8; font-size: 11.5px; }
+#wx .k { color: #9fc4ee; }
 </style>
 </head>
 <body>
-<div id="loader">
-  <div>DOKULAR YUKLENIYOR (NASA)</div>
-  <div id="barDis"><div id="bar"></div></div>
-</div>
+<div id="crosshair"></div>
+<div id="ring"><i class="t"></i><i class="b"></i></div>
 <div id="ui">
-  <h1>🌍 Dünya — Uzaydan Görünüm</h1>
-  <p>Sürükle: döndür &nbsp;|&nbsp; Scroll: yakınlaş &nbsp;|&nbsp; R: sıfırla &nbsp;|&nbsp; G: Güneş kurgusu</p>
+  <h1>🌍 DÜNYA — UZAYDAN</h1>
+  <p>sürükle döndür · scroll yakınlaş · R sıfırla · G güneş kadrajda</p>
 </div>
 <div id="info">
-  Yörünge yüksekliği: ~400 km (ISS)<br>
-  Doku: NASA — three.js örnek kütüphanesi<br>
-  Güneş ve Ay: ölçek/yörünge sahneye sığdırıldı (gerçekleri çok uzak)<br>
-  G: gündüz ↔ Güneş kadrajda &nbsp; R: sıfırla
+  Doku: NASA (three.js örnek kütüphanesi) · Hava: Open-Meteo (gerçek veri)<br>
+  Güneş gerçek saatine göre hareket eder · ölçekler gösteri için sıkıştırıldı<br>
+  <span id="issbilgi">🛰️ ISS: hesaplanıyor…</span>
 </div>
-<div id="crosshair"></div>
+<div id="timebar">
+  <span id="clock">—</span>
+  <button class="tbtn" id="tpause" title="Duraklat/devam">⏸</button>
+  <button class="tbtn" id="tminus" title="-1 saat">⏮</button>
+  <button class="tbtn" id="tplus" title="+1 saat">⏭</button>
+  <button class="tbtn" id="tspeed">×1</button>
+  <button class="tbtn on" id="tnow" title="Gerçek saate dön">🕐</button>
+</div>
+<div id="panel">
+  <h2>🔍 KONUM</h2>
+  <div id="go"><input id="q" placeholder="şehir / ülke ara…" autocomplete="off"><button class="tbtn" id="qgo">Git</button></div>
+  <div style="margin-top:5px"><button class="tbtn" id="trbtn" style="width:100%">🇹🇷 Türkiye'ye yaklaş</button></div>
+  <div style="margin-top:4px"><button class="tbtn" id="geobtn" style="width:100%">📍 Konumuma git</button></div>
+  <h2>🗂 KATMANLAR</h2>
+  <label><input type="checkbox" id="Ltargets">🎯 Hedef nişangahı</label>
+  <label><input type="checkbox" id="Llights" checked>🌃 Gece şehir ışıkları</label>
+  <label><input type="checkbox" id="Lclouds" checked>🌫️ Bulutlar</label>
+  <label><input type="checkbox" id="Lsun" checked>☀️ Güneş diski</label>
+  <label><input type="checkbox" id="Lmoon" checked>🌙 Ay</label>
+  <label><input type="checkbox" id="Liss" checked>🛰️ ISS yörüngesi</label>
+  <label><input type="checkbox" id="Lstars" checked>⭐ Yıldızlar</label>
+  <label><input type="checkbox" id="Latmo" checked>✨ Atmosfer halesi</label>
+  <label><input type="checkbox" id="Lwx" checked>🌦️ Hava paneli</label>
+  <label><input type="checkbox" id="Lwxgrid" checked>🌧️ Canlı hava noktaları</label>
+  <div id="wx"></div>
+</div>
 
 <script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-  }
-}
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"
+} }
 </script>
 
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-// ─── Sahne ───────────────────────────────────────────────
+// ═══════════ SAHNE ═══════════
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 3000);
-camera.position.set(0, 0, 4.2); // ISS mesafesi
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 1000);
+camera.position.set(0, 0, 4.2);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
-// ─── Kontroller ──────────────────────────────────────────
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.minDistance = 2.5;
-controls.maxDistance = 12;
-controls.enablePan = false;
-controls.autoRotate = true;
-controls.autoRotateSpeed = 0.3;
+controls.enableDamping = true; controls.dampingFactor = 0.06;
+controls.minDistance = 1.5; controls.maxDistance = 30; controls.enablePan = false;
 
-// ─── Yıldızlar ───────────────────────────────────────────
-function createStars() {
-  const geo = new THREE.BufferGeometry();
-  const count = 15000;
-  const pos = new Float32Array(count * 3);
-  const sizes = new Float32Array(count);
-  const colors = new Float32Array(count * 3);
-  for(let i=0; i<count; i++) {
-    const r = 500 + Math.random() * 500;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2*Math.random()-1);
-    pos[i*3] = r * Math.sin(phi) * Math.cos(theta);
-    pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-    pos[i*3+2] = r * Math.cos(phi);
-    sizes[i] = 0.5 + Math.random() * 1.5;
-    const temp = Math.random();
-    colors[i*3] = 0.8 + temp*0.2;
-    colors[i*3+1] = 0.8 + temp*0.1;
-    colors[i*3+2] = 1.0;
-  }
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+// ═══════════ ZAMAN MOTORU ═══════════
+// simMs = gerçek UTC + kullanıcı ofseti (hızlandırılmış timestep destekli)
+let simOffsetMs = 0, speedX = 1, playing = true;
+const HIZLAR = [1, 60, 600, 3600];
+let hizIdx = 0;
+const simDate = () => new Date(Date.now() + simOffsetMs);
 
-  const mat = new THREE.ShaderMaterial({
-    uniforms: { time: { value: 0 } },
-    vertexShader: `
-      attribute float size;
-      varying vec3 vColor;
-      uniform float time;
-      void main() {
-        vColor = color;
-        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * (200.0 / -mvPos.z);
-        gl_Position = projectionMatrix * mvPos;
-      }
-    `,
-    fragmentShader: `
-      varying vec3 vColor;
-      void main() {
-        float d = length(gl_PointCoord - 0.5) * 2.0;
-        float alpha = 1.0 - smoothstep(0.0, 1.0, d);
-        gl_FragColor = vec4(vColor, alpha);
-      }
-    `,
-    transparent: true,
-    vertexColors: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
-  });
-  return new THREE.Points(geo, mat);
+function gunDilimi(d) { // yılın kaçıncı günü
+  return Math.floor((d - new Date(Date.UTC(d.getUTCFullYear(),0,0))) / 864e5);
 }
-scene.add(createStars());
-
-// ─── NASA dokuları (three.js örnek kütüphanesi, jsdelivr CDN) ───
-const BASE = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r185/examples/textures/planets/';
-const maxAniso = renderer.capabilities.getMaxAnisotropy();
-
-// Yedek prosedürel doku — ağ erişimi olmazsa devreye girer
-function createEarthTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 2048; canvas.height = 1024;
-  const ctx = canvas.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, 0, 1024);
-  grad.addColorStop(0, '#1a3a5c'); grad.addColorStop(0.5, '#0a5a9a'); grad.addColorStop(1, '#1a3a5c');
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, 2048, 1024);
-  ctx.fillStyle = '#2d5a1e';
-  [[350,250,280,200],[450,520,120,280],[980,380,200,320],[1200,200,500,280],[1550,600,180,120]]
-    .forEach(c => ctx.fillRect(c[0], c[1], c[2], c[3]));
-  ctx.fillStyle = '#e8f4ff';
-  ctx.fillRect(0, 0, 2048, 60); ctx.fillRect(0, 940, 2048, 84);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+function güneşKonumu(d) {
+  // Basitleştirilmiş: deklinasyon + güneş boylamı yeterince isabetli (±1°)
+  const utcH = d.getUTCHours() + d.getUTCMinutes()/60 + d.getUTCSeconds()/3600;
+  const decl = 23.44 * Math.sin(2*Math.PI*(gunDilimi(d) - 81) / 365.25);
+  const sunLon = ((-15*(utcH - 12) + 540) % 360) - 180; // -180..180
+  return { decl, sunLon };
 }
 
-const yukle = new THREE.LoadingManager();
-const bar = document.getElementById('bar');
-const loader = document.getElementById('loader');
-yukle.onProgress = (url, gelen, toplam) => { bar.style.width = (gelen/toplam*100) + '%'; };
-yukle.onLoad = () => {
-  loader.style.opacity = '0';
-  setTimeout(() => loader.style.display = 'none', 800);
+// ═══════════ DOKULAR ═══════════
+const loader = new THREE.TextureLoader();
+loader.setCrossOrigin('anonymous');
+const B = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r185/examples/textures/planets/';
+const NASA = {
+  day:   loader.load(B + 'earth_atmos_2048.jpg'),    // NASA gündüz
+  night: loader.load(B + 'earth_lights_2048.png'),   // NASA şehir ışıkları
+  cloud: loader.load(B + 'earth_clouds_1024.png'),   // ayrık bulut katmanı
+  spec:  loader.load(B + 'earth_specular_2048.jpg'), // okyanus parlaklığı
+  moon:  loader.load(B + 'moon_1024.jpg')
 };
-yukle.onError = (url) => {
-  console.warn('Doku yuklenemedi:', url);
-  if(url.includes('earth_atmos')) {
-    earthMat.map = createEarthTexture();
-    earthMat.needsUpdate = true;
-  }
-};
-const loaderT = new THREE.TextureLoader(yukle);
-const srgb = t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; };
+NASA.day.colorSpace = THREE.SRGBColorSpace;
+NASA.night.colorSpace = THREE.SRGBColorSpace;
+NASA.moon.colorSpace = THREE.SRGBColorSpace;
 
-const dayTex    = loaderT.load(BASE + 'earth_atmos_2048.jpg', srgb);     // gündüz
-const nightTex  = loaderT.load(BASE + 'earth_lights_2048.png', srgb);    // şehir ışıkları
-const specTex   = loaderT.load(BASE + 'earth_specular_2048.jpg');         // okyanus parlaması
-const cloudTex  = loaderT.load(BASE + 'earth_clouds_1024.png', srgb);    // gerçek bulutlar
-const moonTex   = loaderT.load(BASE + 'moon_1024.jpg', srgb);            // Ay yüzeyi
-
-// ─── Dünya ───────────────────────────────────────────────
+// ═══════════ DÜNYA ═══════════
 const earthGroup = new THREE.Group();
 scene.add(earthGroup);
 
-// FIZIK: Ayni karede tam aydinlik Dunya + Gunes diski imkansiz (ISS gercekli —
-// Gunes'i goruyorsan Dunya sirtindan aydinlanir, hilal/karanlik gorunur).
-// Iki kurgu, G tusuyla gecis:
-const FICAN_A = new THREE.Vector3(0.8, 0.2, 0.55).normalize().multiplyScalar(130);  // aydinlik Dunya, Gunes kadraj disinda
-const FICAN_B = new THREE.Vector3(0.42, 0.12, -0.91).normalize().multiplyScalar(130); // Gunes kadrajda, Dunya hilal + sehir isiklari
-const sunPos = FICAN_A.clone();
-
-const earthGeo = new THREE.SphereGeometry(1, 128, 64);
 const earthMat = new THREE.MeshPhongMaterial({
-  map: dayTex,
-  specularMap: specTex,   // güneş yalnız okyanusta parlar
-  specular: 0x555555,
-  shininess: 22,
-  emissive: 0xffffff,     // gece tarafında şehir ışıkları
-  emissiveMap: nightTex,
-  emissiveIntensity: 1.1,
+  map: NASA.day, emissiveMap: NASA.night,
+  emissive: new THREE.Color(0xffcf9a), emissiveIntensity: 1.4,
+  specularMap: NASA.spec, specular: new THREE.Color(0x4a6f9c), shininess: 22
 });
-const earth = new THREE.Mesh(earthGeo, earthMat);
+const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 64), earthMat);
 earthGroup.add(earth);
 
-// ─── Atmosfer Glow ───────────────────────────────────────
-const atmosGeo = new THREE.SphereGeometry(1.015, 128, 64);
-const atmosMat = new THREE.ShaderMaterial({
-  uniforms: {
-    sunDir: { value: sunPos.clone().normalize() }
-  },
-  vertexShader: `
-    varying vec3 vNormal;
-    varying vec3 vWorldPos;
-    void main() {
-      vNormal = normalize(normalMatrix * normal);
-      vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: `
-    uniform vec3 sunDir;
-    varying vec3 vNormal;
-    varying vec3 vWorldPos;
-    void main() {
-      vec3 viewDir = normalize(cameraPosition - vWorldPos);
-      float fresnel = 1.0 - dot(viewDir, vNormal);
-      fresnel = pow(fresnel, 3.0);
-      float sunDot = max(dot(vNormal, sunDir), 0.0);
-      vec3 dayColor = vec3(0.3, 0.6, 1.0);
-      vec3 sunsetColor = vec3(1.0, 0.4, 0.2);
-      float sunsetFactor = pow(1.0 - abs(sunDot), 4.0);
-      vec3 color = mix(dayColor, sunsetColor, sunsetFactor * 0.5);
-      float alpha = fresnel * 0.7 * (0.5 + 0.5 * sunDot);
-      gl_FragColor = vec4(color, alpha);
-    }
-  `,
-  transparent: true,
-  side: THREE.FrontSide,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending
-});
-const atmosphere = new THREE.Mesh(atmosGeo, atmosMat);
-earthGroup.add(atmosphere);
-
-// ─── Bulut katmanı (gerçek NASA bulut dokusu) ────────────
-const cloudMat = new THREE.MeshPhongMaterial({
-  map: cloudTex,
-  transparent: true,
-  opacity: 0.85,
-  depthWrite: false,
-});
-const clouds = new THREE.Mesh(new THREE.SphereGeometry(1.008, 64, 32), cloudMat);
+const clouds = new THREE.Mesh(
+  new THREE.SphereGeometry(1.016, 96, 48),
+  new THREE.MeshLambertMaterial({ map: NASA.cloud, transparent: true, opacity: .82, depthWrite: false })
+);
 earthGroup.add(clouds);
 
-// ─── Güneş ───────────────────────────────────────────────
-// Isik kaynagi gunesin gercek konumundan gelir (Dunya + Ay + bulutlar ayni kaynaktan aydinlanir)
+// Atmosfer rötuşu: önceki sönük halosunu güçlendirdim (göz denetiminde tespit edildi)
+const atmosMat = new THREE.ShaderMaterial({
+  uniforms: { sunDir: { value: new THREE.Vector3(0,0,1) } },
+  vertexShader: `
+    varying vec3 vN; varying vec3 vW;
+    void main() { vN = normalize(mat3(modelMatrix) * normal);
+      vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz;
+      gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader: `
+    uniform vec3 sunDir; varying vec3 vN; varying vec3 vW;
+    void main() {
+      vec3 V = normalize(cameraPosition - vW);
+      float f = pow(clamp(1.0 - abs(dot(vN, V)), 0.0, 1.0), 2.4);
+      float gun = 0.35 + 0.65 * clamp(dot(vN, normalize(sunDir)), 0.0, 1.0);
+      vec3 c = f * gun * vec3(0.30, 0.56, 1.0) * 2.2;
+      gl_FragColor = vec4(c, f * gun); }`,
+  transparent: true, blending: THREE.AdditiveBlending, side: THREE.FrontSide, depthWrite: false
+});
+const atmos = new THREE.Mesh(new THREE.SphereGeometry(1.07, 96, 48), atmosMat);
+scene.add(atmos);
+
+// ═══════════ GÜNEŞ ═══════════
 const sunLight = new THREE.DirectionalLight(0xfff5e6, 2.6);
 scene.add(sunLight);
-scene.add(new THREE.AmbientLight(0x0a1020, 0.35)); // gece tarafi cok siyah kalmasin
+scene.add(new THREE.AmbientLight(0x0a1020, 0.35));
 
-// Gunes diski + parlamasi
 const sunMesh = new THREE.Mesh(
   new THREE.SphereGeometry(4.5, 32, 16),
   new THREE.MeshBasicMaterial({ color: 0xffee99 })
 );
 scene.add(sunMesh);
 
-function glowSprite() {
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 256;
-  const g = c.getContext('2d');
-  const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
-  grad.addColorStop(0, 'rgba(255,240,200,1)');
-  grad.addColorStop(0.25, 'rgba(255,200,120,0.55)');
-  grad.addColorStop(1, 'rgba(255,150,50,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 256, 256);
+function glowSprite(r, g, b, s) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(128,128,0, 128,128,128);
+  grad.addColorStop(0, `rgba(${r},${g},${b},1)`); grad.addColorStop(.3, `rgba(${r},${g},${b},.35)`);
+  grad.addColorStop(.6, `rgba(${r},${g},${b},.08)`); grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,256,256);
   const tex = new THREE.CanvasTexture(c);
-  const mat = new THREE.SpriteMaterial({
-    map: tex, transparent: true,
-    blending: THREE.AdditiveBlending, depthWrite: false
-  });
-  const sp = new THREE.Sprite(mat);
-  sp.scale.set(45, 45, 1);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  sp.scale.set(s, s, 1);
   return sp;
 }
-const sunGlow = glowSprite();
+const sunGlow = glowSprite(255,235,160, 45);
 scene.add(sunGlow);
 
-// ─── Ay ──────────────────────────────────────────────────
-// Gercek yari cap orani ~0.27 dogru; gercek yorunge (60 Dünya yari capi) ekrana
-// sigmaz — gosteri icin yaklastirildi (uyari #info'da). Ay, Dunya'nin sol-ustune
-// konar; pivot y ekseninde donerek gokyuzunde dolasir (Dunya'nin ardamdan gizlenir, onunden gecer).
+// ═══════════ AY (rötuş: tam kadrajda, sol-üstte başlar) ═══════════
+// Yarıçap oranı 0.27 gerçek; yörünge gösteri için sıkıştırıldı. Ay Kamera
+// çerçevesinde döner; Dünya'nın ardasına geçince doğal olarak gizlenir.
 const moonPivot = new THREE.Group();
 scene.add(moonPivot);
-
 const moon = new THREE.Mesh(
-  new THREE.SphereGeometry(0.3, 64, 32),
-  new THREE.MeshStandardMaterial({ map: moonTex, roughness: 1, metalness: 0 })
+  new THREE.SphereGeometry(0.32, 64, 32),
+  new THREE.MeshStandardMaterial({ map: NASA.moon, roughness: 1, metalness: 0 })
 );
-moon.position.set(-2.4, 1.7, 0);
+moon.position.set(2.6, 1.3, -3.6); // Dunya siluetinin disinda: sag-ustte tam kadrajda (r=4.6)
 moonPivot.add(moon);
 
-// ─── ISS pencere çerçevesi ───────────────────────────────
-const windowFrame = new THREE.Group();
-scene.add(windowFrame);
+// ═══════════ ISS ═══════════
+const issDot = new THREE.Group();
+const issBody = new THREE.Mesh(new THREE.BoxGeometry(.05,.02,.02), new THREE.MeshStandardMaterial({ color:0xdddddd, emissive:0x888888, emissiveIntensity:.6, roughness:.4 }));
+const issPanelGeo = new THREE.BoxGeometry(.09,.003,.03);
+const issPanelMat = new THREE.MeshStandardMaterial({ color:0x224488, emissive:0x1133aa, emissiveIntensity:.7, roughness:.3 });
+[-.085,.085].forEach(x => { const p = new THREE.Mesh(issPanelGeo, issPanelMat); p.position.x = x; issDot.add(p); });
+issDot.add(issBody);
+earthGroup.add(issDot); // çocuk → haritadaki yerinin üzerinde durur
 
-const frameGeo = new THREE.TorusGeometry(1.8, 0.08, 8, 64);
-const frameMat = new THREE.MeshStandardMaterial({
-  color: 0x444444, roughness: 0.4, metalness: 0.8,
-});
-const ring = new THREE.Mesh(frameGeo, frameMat);
-ring.position.set(0, 0, -0.1);
-windowFrame.add(ring);
+const ISS_YORUNGE = 1.02;
+const issOrbit = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(
+    Array.from({length:129}, (_,i) => { const a = i/128*Math.PI*2; return new THREE.Vector3(Math.cos(a)*ISS_YORUNGE, 0, Math.sin(a)*ISS_YORUNGE); })
+  ),
+  new THREE.LineBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: .25 }) // rötuş: .5→.25
+);
+issOrbit.rotation.x = THREE.MathUtils.degToRad(51.6);
+issOrbit.rotation.y = .6;
+scene.add(issOrbit);
 
-const barGeo = new THREE.BoxGeometry(3.6, 0.04, 0.04);
-const bar1 = new THREE.Mesh(barGeo, frameMat);
-bar1.position.set(0, 0, -0.12);
-windowFrame.add(bar1);
-const bar2 = new THREE.Mesh(barGeo, frameMat);
-bar2.position.set(0, 0, -0.12);
-bar2.rotation.z = Math.PI/2;
-windowFrame.add(bar2);
-
-camera.position.set(0, 0, 4.2);
-controls.target.set(0, 0, 0);
-
-// ─── R / G efektleri ─────────────────────────────────────
-function sunUygula(v) {
-  sunPos.copy(v);
-  sunLight.position.copy(v);
-  sunMesh.position.copy(v);
-  sunGlow.position.copy(v);
-  atmosMat.uniforms.sunDir.value.copy(v).normalize();
+// ═══════════ YILDIZLAR ═══════════
+{
+  const pos = [];
+  for (let i = 0; i < 15000; i++) {
+    const r = 300 + Math.random()*300, t = Math.random()*Math.PI*2, p = Math.acos(2*Math.random()-1);
+    pos.push(r*Math.sin(p)*Math.cos(t), r*Math.cos(p), r*Math.sin(p)*Math.sin(t));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color:0xffffff, size:.9, sizeAttenuation:true, transparent:true, opacity:.85 })));
 }
-let guncel = 'A';
-sunUygula(FICAN_A); // baslangic: aydinlik Dunya
-if (location.search.includes('sun=B')) { guncel = 'B'; sunUygula(FICAN_B); }
 
-window.addEventListener('keydown', e => {
-  if(e.key === 'r' || e.key === 'R') {
-    camera.position.set(0, 0, 4.2);
-    controls.target.set(0, 0, 0);
-    controls.update();
+// ═══════════ HEDEF NİŞANGAHI (rötuş: daha soluk, kapatılabilir) ═══════════
+const reticle = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(
+    Array.from({length:65}, (_,i) => { const a = i/64*Math.PI*2; return new THREE.Vector3(Math.cos(a)*1.04, Math.sin(a)*1.04, 0); })
+  ),
+  new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: .45 })
+);
+scene.add(reticle);
+
+// ═══════════ GÖRÜŞ MERKEZİ + GÜNEŞ UYGULAMA ═══════════
+// Matematik: Dünya grubu ψ = -90° - λv döner (λv = ekran merkezindeki boylam).
+// Güneş, kamera çerçevesinde λv'ye göre saat açısıyla konur → aydınlık bölge
+// HER ZAMAN gerçek güneş boylamının üstündedir (terminator doğru).
+let lambdaV = 0; // başlangıç: güneş-merkezli öğle görünümü
+const RAD = THREE.MathUtils.degToRad;
+const sunDirWorld = new THREE.Vector3(0,0,1);
+
+function guneşUygula() {
+  const { decl, sunLon } = güneşKonumu(simDate());
+  lambdaV = hedefLambdaV; // saat kaydırması merkez boylamı değiştirmez
+  if (sunEdge && !flyAnim) lambdaV = sunLon - 32; // G modu: güneş ekran kenarında
+  earthGroup.rotation.y = -Math.PI/2 - RAD(lambdaV);
+  const d = RAD(decl), L = RAD(sunLon - lambdaV);
+  sunDirWorld.set(Math.sin(L)*Math.cos(d), Math.sin(d), Math.cos(L)*Math.cos(d)).normalize();
+  sunLight.position.copy(sunDirWorld).multiplyScalar(130);
+  sunMesh.position.copy(sunDirWorld).multiplyScalar(130);
+  sunGlow.position.copy(sunDirWorld).multiplyScalar(130);
+  atmosMat.uniforms.sunDir.value.copy(sunDirWorld);
+}
+
+// ═══════════ ISS konumu (TLE'suz sinüzoidal yaklaşım, ±derece isabet) ═══════════
+function issUygula() {
+  const tMin = simDate() / 60000; // epoch'tan bu yana dakika
+  const lat = 51.6 * Math.sin(2*Math.PI * tMin / 92.9);
+  const lon = ((340 + 24.7 * tMin / 60 * 4) % 360); // ground-track sürüklenmesi
+  const lonN = ((lon + 540) % 360) - 180;
+  const φ = RAD(lat), λ = RAD(lonN);
+  // yerel çerçeve: boylam 0 → +X, 90°D → -Z (Dünya grubunun yerel ekseni)
+  issDot.position.set(
+    Math.cos(φ) * Math.cos(λ),
+    Math.sin(φ),
+    -Math.cos(φ) * Math.sin(λ)
+  ).multiplyScalar(ISS_YORUNGE + .015);
+  issDot.lookAt(0, 0, 0);
+  return { lat, lon: lonN };
+}
+
+// ═══════════ UÇUŞ (ülkeye/sehre yanaşma) ═══════════
+let hedefLambdaV = 0;   // kullanıcı/öntanımlı görüş merkezi boylamı
+let flyAnim = null;
+function normalizeLon(x) { return ((x + 540) % 360) - 180; }
+
+function flyTo(lat, lon, dist = 2.9) {
+  // Hedef ekran-merkezi yönü: (0, sinφ, cosφ) normalize · mesafe
+  const φ = RAD(lat);
+  const to = new THREE.Vector3(0, Math.sin(φ), Math.cos(φ)).normalize().multiplyScalar(dist);
+  const fromL = lambdaV, toL = normalizeLon(lon);
+  let dL = toL - fromL; if (dL > 180) dL -= 360; if (dL < -180) dL += 360;
+  flyAnim = { t: 0, dur: 1.6, fromCam: camera.position.clone(), toCam: to, fromL, dL };
+  controls.enabled = false;
+}
+function flyStep(dt) {
+  if (!flyAnim) return;
+  flyAnim.t = Math.min(1, flyAnim.t + dt / flyAnim.dur);
+  const e = 1 - Math.pow(1 - flyAnim.t, 3); // ease-out cubic
+  hedefLambdaV = lambdaV = flyAnim.fromL + flyAnim.dL * e;
+  camera.position.lerpVectors(flyAnim.fromCam, flyAnim.toCam, e);
+  controls.target.set(0,0,0);
+  if (flyAnim.t >= 1) { flyAnim = null; controls.enabled = true; }
+}
+
+// ═══════════ ARAMA + HAVA (Open-Meteo, CORS açık) ═══════════
+const wxBox = document.getElementById('wx');
+let sonKonum = null, wxTimer = null;
+
+async function ara(sorgu) {
+  try {
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(sorgu)}&count=1&language=tr&format=json`);
+    const d = await r.json();
+    if (!d.results || !d.results.length) throw new Error('bulunamadı');
+    const k = d.results[0];
+    const et = (k.admin1 && k.admin1 !== k.name ? k.admin1 + ', ' : '') + k.name + (k.country ? ' · ' + k.country : '');
+    flyTo(k.latitude, k.longitude, k.feature_type === 'country' ? 3.4 : 2.7);
+    sonKonum = { ...k, etiket: et };
+    wxYukle(true);
+  } catch (e) {
+    wxGöster(`<b>⚠ Konum bulunamadı:</b> ${sorgu.replace(/</g,'&lt;')}`);
   }
-  if(e.key === 'g' || e.key === 'G') { // kurgu gecisi: aydinlik Dunya <-> Gunes kadrajda
-    guncel = guncel === 'A' ? 'B' : 'A';
-    sunUygula(guncel === 'A' ? FICAN_A : FICAN_B);
+}
+
+function wxGöster(html) { wxBox.style.display = 'block'; wxBox.innerHTML = html; }
+
+async function wxYukle(ilk = false) {
+  if (!sonKonum) return;
+  const L = sonKonum;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${L.latitude}&longitude=${L.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const c = d.current, day = d.daily;
+    const WMO = {0:['Açık','☀️'],1:['Az bulutlu','🌤️'],2:['Parçalı bulutlu','⛅'],3:['Kapalı','☁️'],45:['Sisli','🌫️'],48:['Sisli','🌫️'],51:['Çisenti','🌦️'],53:['Yağmurlu','🌧️'],55:['Yağmurlu','🌧️'],61:['Yağmurlu','🌧️'],63:['Kuvvetli yağış','🌧️'],65:['Şiddetli yağış','🌧️'],71:['Karlı','🌨️'],73:['Karlı','🌨️'],75:['Yoğun kar','❄️'],80:['Sağanak','🌦️'],81:['Sağanak','🌧️'],82:['Kuvvetli sağanak','⛈️'],95:['Gök gürültülü','⛈️'],96:['Dolulu fırtına','⛈️'],99:['Dolulu fırtına','⛈️']};
+    const [metin, ikon] = WMO[c.weather_code] || ['—','🌡️'];
+    const gun = new Date(c.time);
+    const yerel = gun.toLocaleString('tr-TR', { timeZone: d.timezone, hour: '2-digit', minute: '2-digit' });
+    wxGöster(`<b>${ikon} ${L.etiket}</b><br>
+      <span class="k">Durum:</span> ${metin} · ${c.temperature_2m}°C (hissedilen ${c.apparent_temperature}°C)<br>
+      <span class="k">Nem:</span> %${c.relative_humidity_2m} · <span class="k">Bulut:</span> %${c.cloud_cover}<br>
+      <span class="k">Rüzgâr:</span> ${c.wind_speed_10m} km/sa · <span class="k">Yağış:</span> ${c.precipitation} mm<br>
+      <span class="k">Bugün:</span> ${day.temperature_2m_min[0]}° / ${day.temperature_2m_max[0]}°C<br>
+      <span class="k">Güneş:</span> ↑${day.sunrise[0].slice(11,16)} ↓${day.sunset[0].slice(11,16)} <span class="k">(yerel ${yerel})</span>`);
+    if (ilk) { clearInterval(wxTimer); wxTimer = setInterval(() => wxYukle(false), 10*60*1000); }
+  } catch (e) {
+    wxGöster(`<b>${L.etiket}</b><br><span class="k">Hava verisi alınamadı (çevrimdışı mısın?)</span>`);
   }
+}
+
+document.getElementById('qgo').onclick = () => { const v = document.getElementById('q').value.trim(); if (v) ara(v); };
+document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') { const v = e.target.value.trim(); if (v) ara(v); } });
+document.getElementById('trbtn').onclick = () => {
+  flyTo(39.0, 35.2, 3.4);
+  sonKonum = { latitude: 39.0, longitude: 35.2, etiket: '🇹🇷 Türkiye' };
+  wxBox.style.display = 'block';
+  wxGöster('<b>🇹🇷 Türkiye geneli</b><br><span class="k">Ankara referans hava için şehre tıklayıp "Git" yaz.</span>');
+  fetch('https://api.open-meteo.com/v1/forecast?latitude=39.92&longitude=32.85&current=temperature_2m,weather_code,cloud_cover&timezone=auto')
+    .then(r => r.json())
+    .then(d => { if (sonKonum.etiket.startsWith('🇹🇷')) wxGöster(`<b>🇹🇷 Türkiye (Ankara örnek)</b><br><span class="k">Şu an:</span> ${d.current.temperature_2m}°C<br><span class="k">Bulut örtüsü:</span> %${d.current.cloud_cover} (küreye yansıtılamadı — 2D API)</span>`); })
+    .catch(() => {});
+};
+
+// ═══════════ KATMAN ANAHTARLARI ═══════════
+const $ = id => document.getElementById(id);
+$('Ltargets').onchange = e => { const v = e.target.checked; reticle.visible = v; document.getElementById('crosshair').style.display = v ? 'block' : 'none'; document.getElementById('ring').style.display = v ? 'block' : 'none'; };
+$('Ltargets').dispatchEvent(new Event('change')); // kapali dogum: CSS nişangahlar da kalksin
+$('Llights').onchange = e => { earthMat.emissiveIntensity = e.target.checked ? 1.4 : 0; };
+$('Lclouds').onchange  = e => { clouds.visible = e.target.checked; };
+$('Lsun').onchange     = e => { sunMesh.visible = sunGlow.visible = e.target.checked; };
+$('Lmoon').onchange    = e => { moon.visible = e.target.checked; };
+$('Liss').onchange     = e => { issDot.visible = issOrbit.visible = e.target.checked; };
+$('Lstars').onchange   = e => { scene.children.forEach(c => { if (c.isPoints) c.visible = e.target.checked; }); };
+$('Latmo').onchange    = e => { atmos.visible = e.target.checked; };
+$('Lwx').onchange      = e => { wxBox.style.display = e.target.checked && sonKonum ? 'block' : (e.target.checked ? 'none' : 'none'); if (e.target.checked && sonKonum) wxYukle(false); };
+$('Lwxgrid').onchange   = e => { wxDots.visible = e.target.checked; };
+
+// ═══════════ SAAT KONTROLLERİ ═══════════
+const clockEl = $('clock');
+function saatGöster() {
+  const d = simDate();
+  const s = d.toLocaleString('tr-TR', { timeZone: 'UTC', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  clockEl.textContent = `${s} UTC${playing && speedX === 1 ? '' : speedX > 1 ? ` · ×${speedX}` : ' · ⏸'}`;
+}
+$('tpause').onclick = () => { playing = !playing; $('tpause').textContent = playing ? '⏸' : '▶'; saatGöster(); };
+$('tminus').onclick = () => { simOffsetMs -= 3600e3; };
+$('tplus').onclick  = () => { simOffsetMs += 3600e3; };
+$('tspeed').onclick = () => { hizIdx = (hizIdx + 1) % HIZLAR.length; speedX = HIZLAR[hizIdx]; $('tspeed').textContent = '×' + speedX; $('tspeed').classList.toggle('on', speedX > 1); };
+$('tnow').onclick   = () => { simOffsetMs = 0; speedX = 1; hizIdx = 0; playing = true; $('tspeed').textContent = '×1'; $('tspeed').classList.remove('on'); $('tpause').textContent = '⏸'; };
+
+// ═══════════ CANLI HAVA NOKTALARI (Open-Meteo çoklu konum, 24 şehir) ═══════════
+// Lat/lon → Dünya grubunun yerel vektörü (boylam 0 → +X, 90°D → -Z)
+function llToVec(lat, lon, r) {
+  const φ = RAD(lat), λ = RAD(lon);
+  return new THREE.Vector3(Math.cos(φ)*Math.cos(λ), Math.sin(φ), -Math.cos(φ)*Math.sin(λ)).multiplyScalar(r);
+}
+
+const SEHIRLER = [
+  ['Ankara',39.92,32.85],['İstanbul',41.01,28.98],['İzmir',38.42,27.14],['Antalya',36.90,30.70],
+  ['Trabzon',41.00,39.72],['Erzurum',39.91,41.27],['Gaziantep',37.07,37.38],['Samsun',41.29,36.33],
+  ['Londra',51.51,-0.13],['Berlin',52.52,13.40],['Paris',48.86,2.35],['Moskova',55.76,37.62],
+  ['Kahire',30.04,31.24],['Dubai',25.20,55.27],['New York',40.71,-74.01],['Tokyo',35.68,139.69],
+  ['Sydney',-33.87,151.21],['Nairobi',-1.29,36.82],['São Paulo',-23.55,-46.63]
+];
+
+// WMO kodu → renk (gökyüzü ikonları kadar sezgisel)
+function wmoRenk(k) {
+  if (k >= 95) return [0.72,0.30,1.00];            // fırtına — mor
+  if (k >= 71) return [1.00,1.00,1.00];            // kar — beyaz
+  if (k >= 51) return [0.25,0.62,1.00];            // yağış — mavi
+  if (k >= 45) return [0.62,0.66,0.72];            // sis — gri-mavi
+  if (k >= 2)  return [0.55,0.62,0.72];            // kapalı — gri
+  if (k >= 1)  return [0.82,0.88,0.95];            // az bulutlu
+  return [1.00,0.84,0.30];                          // açık — sarı
+}
+
+const wxGeo = new THREE.BufferGeometry();
+wxGeo.setAttribute('position', new THREE.Float32BufferAttribute(SEHIRLER.flatMap(s => llToVec(s[1], s[2], 1.03).toArray()), 3));
+wxGeo.setAttribute('color', new THREE.Float32BufferAttribute(SEHIRLER.flatMap(() => [1,0.84,0.30]), 3));
+const wxDots = new THREE.Points(wxGeo, new THREE.PointsMaterial({
+  size: 0.062, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 1,
+  depthWrite: false
+}));
+earthGroup.add(wxDots);
+
+async function wxGridYukle() {
+  const lats = SEHIRLER.map(s => s[1]).join(','), lons = SEHIRLER.map(s => s[2]).join(',');
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=weather_code,temperature_2m&timezone=auto`);
+    const d = await r.json();
+    const dizi = Array.isArray(d) ? d : [d];
+    const col = wxGeo.attributes.color;
+    dizi.forEach((s, i) => col.setXYZ(i, ...wmoRenk(s.current?.weather_code ?? -1)));
+    col.needsUpdate = true;
+    wxZaman = new Date();
+  } catch (e) { /* çevrimdışı: noktalar son renkleriyle kalır */ }
+}
+let wxZaman = null;
+wxGridYukle(); setInterval(wxGridYukle, 10*60*1000);
+
+// Noktaya tıkla → o şehre yaklaş + hava kartını aç
+const ray = new THREE.Raycaster(); ray.params.Points.threshold = 0.06;
+const imlec = new THREE.Vector2();
+renderer.domElement.addEventListener('click', ev => {
+  if (!wxDots.visible || flyAnim) return;
+  imlec.set((ev.clientX/innerWidth)*2 - 1, -(ev.clientY/innerHeight)*2 + 1);
+  ray.setFromCamera(imlec, camera);
+  const v = ray.intersectObject(wxDots);
+  if (!v.length) return;
+  const s = SEHIRLER[v[0].index];
+  flyTo(s[1], s[2], 2.7);
+  sonKonum = { latitude: s[1], longitude: s[2], etiket: '📍 ' + s[0] };
+  $('Lwx').checked = true; wxYukle(true);
 });
 
-// ─── Animation Loop ──────────────────────────────────────
-const clock = new THREE.Clock();
+// ═══════════ KONUMUMA GIT (tarayıcı konumu — HTTPS'de çalışır) ═══════════
+$('geobtn').onclick = () => {
+  if (!navigator.geolocation) { wxGöster('<b>⚠ Tarayıcın konum desteklemiyor</b>'); wxBox.style.display='block'; return; }
+  wxGöster('<b>📍 Konum isteniyor…</b> (tarayıcı izni gerekir)'); wxBox.style.display = 'block';
+  navigator.geolocation.getCurrentPosition(
+    async p => {
+      const { latitude: lat, longitude: lon } = p.coords;
+      let ad = `${lat.toFixed(2)}° / ${lon.toFixed(2)}°`;
+      try {
+        const g = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=tr`);
+        const k = await g.json();
+        if (k.city || k.locality) ad = `${k.city || k.locality}${k.principalSubdivision ? ', ' + k.principalSubdivision : ''}${k.countryName ? ' · ' + k.countryName : ''}`;
+      } catch (e) {}
+      flyTo(lat, lon, 2.6);
+      sonKonum = { latitude: lat, longitude: lon, etiket: '📍 Senin konumun · ' + ad };
+      $('Lwx').checked = true; wxYukle(true);
+    },
+    () => wxGöster('<b>⚠ Konum izni verilmedi</b><br><span class="k">Arama kutusuna şehir yazabilirsin.</span>'),
+    { timeout: 10000 }
+  );
+};
+
+// ═══════════ R / G ═══════════
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'r' || e.key === 'R') { camera.position.set(0,0,4.2); controls.target.set(0,0,0); controls.update(); }
+  if (e.key === 'g' || e.key === 'G') { sunEdge = !sunEdge; if (flyAnim) flyAnim = null; controls.enabled = true; }
+});
+let sunEdge = false;
+
+function katmanSenkron() {}
+
+// ═══════════ DÖNGÜ ═══════════
+let _son = performance.now();
+let issTick = 0;
+const issInfoEl = document.getElementById('issbilgi');
 function animate() {
   requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
-
-  earth.rotation.y += 0.0002;   // Dünya kendi etrafında
-  clouds.rotation.y += 0.00032; // bulutlar biraz daha hızlı sürüklenir
-  clouds.rotation.x = Math.sin(t * 0.1) * 0.02;
-  moonPivot.rotation.y += 0.00022; // Ay Dünya çevresinde döner
-
-  controls.update();
+  const _sim = performance.now(); const dt = Math.min((_sim - _son)/1000, .1); _son = _sim;
+  if (playing) simOffsetMs += dt * 1000 * (speedX - 1); // gerçek zaman üstüne hız farkı
+  flyStep(dt);
+  guneşUygula();
+  const iss = issUygula(); // ISS haritada sürekli yürür
+  if ((issTick += dt) > .5) {
+    issTick = 0; saatGöster();
+    if (issInfoEl) issInfoEl.innerHTML = `🛰️ ISS: ${iss.lat.toFixed(1)}°${iss.lat>=0?'K':'G'} ${Math.abs(iss.lon).toFixed(1)}°${iss.lon>=0?'D':'B'} · ${iss.lat > 36 && iss.lat < 42 && iss.lon > 26 && iss.lon < 45 ? 'şu an Türkiye üstünde' : 'Türkiye dışında'}`;
+  }
+  moonPivot.rotation.y += dt * .008; // gökyüzünde yavaşça dolaşır (~13 dk/tur)
+  if (!flyAnim) controls.update();
+  reticle.quaternion.copy(camera.quaternion); // ekran-düzlem hedef halkası
   renderer.render(scene, camera);
 }
+saatGöster();
+guneşUygula();
 animate();
 
-// ─── Resize ──────────────────────────────────────────────
-window.addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
+
+// Başlangıç: ?view=tr → Türkiye; ?sunLon=... test parametreleri
+const P = new URLSearchParams(location.search);
+if (P.get('view') === 'tr') flyTo(39.0, 35.2, 3.4);
+else if (P.has('lon')) hedefLambdaV = parseFloat(P.get('lon')) || 0;
+else { const { sunLon } = güneşKonumu(simDate()); hedefLambdaV = sunLon; lambdaV = sunLon; }
 </script>
 </body>
 </html>
