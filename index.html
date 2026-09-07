@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astronot Gözünden Dünya 🌍</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+canvas { display: block; }
+#ui {
+  position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+  color: #8cf; text-align: center; pointer-events: none; user-select: none;
+  text-shadow: 0 0 10px #0af, 0 0 20px #06f;
+}
+#ui h1 { font-size: 18px; letter-spacing: 4px; text-transform: uppercase; opacity: 0.9; }
+#ui p { font-size: 12px; opacity: 0.6; margin-top: 4px; }
+#info {
+  position: absolute; bottom: 20px; left: 20px;
+  color: #6a9; font-size: 11px; pointer-events: none;
+  line-height: 1.6;
+}
+#crosshair {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 40px; height: 40px; pointer-events: none; opacity: 0.3;
+}
+#crosshair::before, #crosshair::after {
+  content: ''; position: absolute; background: #8cf;
+}
+#crosshair::before { width: 20px; height: 1px; top: 19px; left: 10px; }
+#crosshair::after { width: 1px; height: 20px; left: 19px; top: 10px; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1>🌍 Dünya — Uzaydan Görünüm</h1>
+  <p>Sürükle: döndür &nbsp;|&nbsp; Scroll: yakınlaş &nbsp;|&nbsp; R tuşu: sıfırla</p>
+</div>
+<div id="info">
+  Yörünge yüksekliği: ~400 km (ISS)<br>
+  Yerçekimi merkezi: Dünya<br>
+  Görüş açısı: ~3.7°
+</div>
+<div id="crosshair"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ─── Sahne ───────────────────────────────────────────────
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 2000);
+camera.position.set(0, 0, 4.2); // ISS mesafesi
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+// ─── Kontroller ──────────────────────────────────────────
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.minDistance = 2.5;
+controls.maxDistance = 12;
+controls.enablePan = false;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.3;
+
+// ─── Yıldızlar ───────────────────────────────────────────
+function createStars() {
+  const geo = new THREE.BufferGeometry();
+  const count = 15000;
+  const pos = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+  const colors = new Float32Array(count * 3);
+  for(let i=0; i<count; i++) {
+    const r = 500 + Math.random() * 500;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2*Math.random()-1);
+    pos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+    pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    pos[i*3+2] = r * Math.cos(phi);
+    sizes[i] = 0.5 + Math.random() * 1.5;
+    const temp = Math.random();
+    colors[i*3] = 0.8 + temp*0.2;
+    colors[i*3+1] = 0.8 + temp*0.1;
+    colors[i*3+2] = 1.0;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { time: { value: 0 } },
+    vertexShader: `
+      attribute float size;
+      varying vec3 vColor;
+      varying float vSize;
+      uniform float time;
+      void main() {
+        vColor = color;
+        vSize = size;
+        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * (200.0 / -mvPos.z);
+        gl_Position = projectionMatrix * mvPos;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vColor;
+      void main() {
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float alpha = 1.0 - smoothstep(0.0, 1.0, d);
+        gl_FragColor = vec4(vColor, alpha);
+      }
+    `,
+    transparent: true,
+    vertexColors: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  return new THREE.Points(geo, mat);
+}
+scene.add(createStars());
+
+// ─── Dünya ───────────────────────────────────────────────
+const earthGroup = new THREE.Group();
+scene.add(earthGroup);
+
+// Basit prosedürel dokular (gerçek uzay görüntüsü yok — yerel render)
+function createEarthTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048; canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+
+  // Okyanus gradyanı
+  const grad = ctx.createLinearGradient(0, 0, 0, 1024);
+  grad.addColorStop(0, '#1a3a5c');
+  grad.addColorStop(0.3, '#0d4f8b');
+  grad.addColorStop(0.5, '#0a5a9a');
+  grad.addColorStop(0.7, '#0d4f8b');
+  grad.addColorStop(1, '#1a3a5c');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 2048, 1024);
+
+  // Kıtalar (prosedürel)
+  const continents = [
+    // Kuzey Amerika
+    {x: 350, y: 250, w: 280, h: 200},
+    {x: 280, y: 320, w: 150, h: 120},
+    // Güney Amerika
+    {x: 450, y: 520, w: 120, h: 280},
+    // Avrupa
+    {x: 950, y: 220, w: 180, h: 120},
+    // Afrika
+    {x: 980, y: 380, w: 200, h: 320},
+    // Asya
+    {x: 1200, y: 200, w: 500, h: 280},
+    // Avustralya
+    {x: 1550, y: 600, w: 180, h: 120},
+    // Antarktika
+    {x: 0, y: 920, w: 2048, h: 104},
+  ];
+
+  continents.forEach(c => {
+    ctx.fillStyle = '#2d5a1e';
+    ctx.beginPath();
+    // Düzensiz şekil
+    for(let i=0; i<12; i++) {
+      const angle = (i/12) * Math.PI * 2;
+      const rx = c.w/2 * (0.7 + Math.random()*0.6);
+      const ry = c.h/2 * (0.7 + Math.random()*0.6);
+      const px = c.x + c.w/2 + Math.cos(angle) * rx;
+      const py = c.y + c.h/2 + Math.sin(angle) * ry;
+      if(i===0) ctx.moveTo(px, py);
+      else ctx.quadraticCurveTo(
+        c.x + c.w/2 + Math.cos(angle-0.3)*rx*1.3,
+        c.y + c.h/2 + Math.sin(angle-0.3)*ry*1.3,
+        px, py
+      );
+    }
+    ctx.closePath();
+    ctx.fill();
+    // Detay
+    ctx.fillStyle = '#3d7a2e';
+    ctx.fill();
+  });
+
+  // Buzullar
+  ctx.fillStyle = '#e8f4ff';
+  ctx.fillRect(0, 0, 2048, 60);
+  ctx.fillRect(0, 940, 2048, 84);
+  ctx.fillStyle = '#f0f8ff';
+  ctx.fillRect(0, 40, 2048, 20);
+  ctx.fillRect(0, 960, 2048, 20);
+
+  // Bulutlar
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  for(let i=0; i<80; i++) {
+    const x = Math.random() * 2048;
+    const y = 100 + Math.random() * 824;
+    const r = 30 + Math.random() * 80;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createBumpTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, 1024, 512);
+  // Dağlar (beyaz noktalar)
+  for(let i=0; i<300; i++) {
+    const x = Math.random() * 1024;
+    const y = 100 + Math.random() * 312;
+    const r = 5 + Math.random() * 20;
+    ctx.fillStyle = `rgba(255,255,255,${0.1 + Math.random()*0.3})`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fill();
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+const earthTex = createEarthTexture();
+const bumpTex = createBumpTexture();
+
+const earthGeo = new THREE.SphereGeometry(1, 128, 64);
+const earthMat = new THREE.MeshStandardMaterial({
+  map: earthTex,
+  bumpMap: bumpTex,
+  bumpScale: 0.02,
+  roughness: 0.7,
+  metalness: 0.1,
+});
+const earth = new THREE.Mesh(earthGeo, earthMat);
+earthGroup.add(earth);
+
+// ─── Atmosfer Glow ───────────────────────────────────────
+const atmosGeo = new THREE.SphereGeometry(1.015, 128, 64);
+const atmosMat = new THREE.ShaderMaterial({
+  uniforms: {
+    sunDir: { value: new THREE.Vector3(1, 0.3, 0.5).normalize() }
+  },
+  vertexShader: `
+    varying vec3 vNormal;
+    varying vec3 vWorldPos;
+    void main() {
+      vNormal = normalize(normalMatrix * normal);
+      vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 sunDir;
+    varying vec3 vNormal;
+    varying vec3 vWorldPos;
+    void main() {
+      vec3 viewDir = normalize(cameraPosition - vWorldPos);
+      float fresnel = 1.0 - dot(viewDir, vNormal);
+      fresnel = pow(fresnel, 3.0);
+      float sunDot = max(dot(vNormal, sunDir), 0.0);
+      vec3 dayColor = vec3(0.3, 0.6, 1.0);
+      vec3 sunsetColor = vec3(1.0, 0.4, 0.2);
+      float sunsetFactor = pow(1.0 - abs(sunDot), 4.0);
+      vec3 color = mix(dayColor, sunsetColor, sunsetFactor * 0.5);
+      float alpha = fresnel * 0.7 * (0.5 + 0.5 * sunDot);
+      gl_FragColor = vec4(color, alpha);
+    }
+  `,
+  transparent: true,
+  side: THREE.FrontSide,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending
+});
+const atmosphere = new THREE.Mesh(atmosGeo, atmosMat);
+earthGroup.add(atmosphere);
+
+// ─── Bulut Tabakası ──────────────────────────────────────
+const cloudGeo = new THREE.SphereGeometry(1.005, 64, 32);
+const cloudCanvas = document.createElement('canvas');
+cloudCanvas.width = 1024; cloudCanvas.height = 512;
+const cctx = cloudCanvas.getContext('2d');
+cctx.fillStyle = 'rgba(0,0,0,0)';
+cctx.fillRect(0, 0, 1024, 512);
+for(let i=0; i<120; i++) {
+  const x = Math.random() * 1024;
+  const y = 150 + Math.random() * 212;
+  const r = 20 + Math.random() * 60;
+  const grad = cctx.createRadialGradient(x, y, 0, x, y, r);
+  grad.addColorStop(0, 'rgba(255,255,255,0.4)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  cctx.fillStyle = grad;
+  cctx.beginPath();
+  cctx.arc(x, y, r, 0, Math.PI*2);
+  cctx.fill();
+}
+const cloudTex = new THREE.CanvasTexture(cloudCanvas);
+const cloudMat = new THREE.MeshStandardMaterial({
+  map: cloudTex,
+  transparent: true,
+  opacity: 0.35,
+  depthWrite: false,
+});
+const clouds = new THREE.Mesh(cloudGeo, cloudMat);
+earthGroup.add(clouds);
+
+// ─── Işıklandırma ────────────────────────────────────────
+const sun = new THREE.DirectionalLight(0xfff5e6, 2.5);
+sun.position.set(5, 2, 3);
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0x1a2a4a, 0.4));
+
+// ─── ISS Penceresi Çerçevesi ─────────────────────────────
+const windowFrame = new THREE.Group();
+scene.add(windowFrame);
+
+const frameGeo = new THREE.TorusGeometry(1.8, 0.08, 8, 64);
+const frameMat = new THREE.MeshStandardMaterial({
+  color: 0x444444,
+  roughness: 0.4,
+  metalness: 0.8,
+});
+
+// Dairesel pencere çerçevesi
+const ring = new THREE.Mesh(frameGeo, frameMat);
+ring.position.set(0, 0, -0.1);
+windowFrame.add(ring);
+
+// Çapraz destekler
+const barGeo = new THREE.BoxGeometry(3.6, 0.04, 0.04);
+const bar1 = new THREE.Mesh(barGeo, frameMat);
+bar1.position.set(0, 0, -0.12);
+windowFrame.add(bar1);
+const bar2 = new THREE.Mesh(barGeo, frameMat);
+bar2.position.set(0, 0, -0.12);
+bar2.rotation.z = Math.PI/2;
+windowFrame.add(bar2);
+
+// Kamera bu pencerenin içinden bakıyor
+camera.position.set(0, 0, 4.2);
+controls.target.set(0, 0, 0);
+
+// ─── R efekti ────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  if(e.key === 'r' || e.key === 'R') {
+    camera.position.set(0, 0, 4.2);
+    controls.target.set(0, 0, 0);
+    controls.update();
+  }
+});
+
+// ─── Animation Loop ──────────────────────────────────────
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  earth.rotation.y += 0.0003;
+  clouds.rotation.y += 0.0005;
+  clouds.rotation.x = Math.sin(t * 0.1) * 0.02;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ─── Resize ──────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
