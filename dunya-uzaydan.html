@@ -1429,7 +1429,7 @@ function animate() {
   // JPL efemerisi RA/Dec ile guncellenir (Dunya'yu perdeleyen sabit Ay duzeldi)
   if (orbitMode) { solarGuncelle(simDate()); }
   else skyGroup.rotation.y = RAD((GMST0 - gmstDeg(simDate())) % 360) - RAD(lambdaV);
-  if (EPHEM) {
+  if (EPHEM && !orbitMode) {   // yorunge modunda konumları solarGuncelle verir; gokyuzu koordinati uzerine yazmasin
     const ayP = ephRA('moon', simDate());
     if (ayP) moon.position.copy(skyDir(ayP.ra, ayP.dec, 46));   // r=46: ~2.4° gorunen cap — Yeni Ay civarinda Gunes'i kapatmaz
     gezegenGrubu.children.forEach(m => {
@@ -1481,6 +1481,7 @@ window.__D = () => ({ cam: camera.position.length().toFixed(2), merkez: merkeziE
   skyDome: !!skyDome && skyDome.visible, domeR: 230,
   gez: gezegenGrubu.children.length, satlink: starlinkNoktalar ? starlinkNoktalar.geometry.drawRange.count : -1,
   karo: document.querySelectorAll('#arsiv .karo').length });
+window.__OLC = () => ({ ay: moon.position.toArray().map(x=>+x.toFixed(2)), dunya: earthGroup.position.toArray().map(x=>+x.toFixed(2)), gunes: sunMesh.position.toArray().map(x=>+x.toFixed(2)), mod: orbitMode });
 window.__SCN = () => scene.children.filter(c => c.visible).map(c => {
   const p = c.getWorldPosition(new THREE.Vector3()), s = c.getWorldScale(new THREE.Vector3());
   return (c.type) + (c.material && c.material.map ? '[tex]' : '') + ' p:[' + p.toArray().map(x => x.toFixed(0)) + '] s:' + s.x.toFixed(1); });
