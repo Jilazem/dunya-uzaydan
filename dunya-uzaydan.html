@@ -236,9 +236,10 @@ const sunLight = new THREE.DirectionalLight(0xfff5e6, 2.6);
 scene.add(sunLight);
 scene.add(new THREE.AmbientLight(0x0a1020, 0.35));
 
+const sunTex = loader.load('dokular/sun.jpg'); sunTex.colorSpace = THREE.SRGBColorSpace;   // gercek Solar Dynamics görünümü (D sabiti henüz tanımsız — literal yol)
 const sunMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(4.5, 32, 16),
-  new THREE.MeshBasicMaterial({ color: 0xffee99 })
+  new THREE.SphereGeometry(4.5, 48, 24),
+  new THREE.MeshBasicMaterial({ map: sunTex, color: 0xffffff })
 );
 scene.add(sunMesh);
 
@@ -256,6 +257,101 @@ function glowSprite(r, g, b, s) {
 }
 const sunGlow = glowSprite(255,235,160, 45);
 scene.add(sunGlow);
+
+// ═══════════ YARDIMCI DOKULAR (canvas) ═══════════
+function sisDokusu() {          // yumusak sis noktacigi (Samanyolu + parlamalar)
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(32,32,0, 32,32,32);
+  g.addColorStop(0, 'rgba(255,255,255,0.85)'); g.addColorStop(.4, 'rgba(255,255,255,0.25)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0,0,64,64);
+  const t = new THREE.CanvasTexture(c); return t;
+}
+function uyduDokusu() {         // solar panel izgarasi (ISS/Starlink govdesi icin)
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+  const x = c.getContext('2d');
+  x.fillStyle = '#0b1c3a'; x.fillRect(0,0,128,64);
+  for (let i = 0; i < 8; i++) { x.fillStyle = i%2 ? '#1d4ed8' : '#2563eb'; x.fillRect(2+i*16, 2, 14, 60);
+    x.fillStyle = '#60a5fa'; x.fillRect(2+i*16, 2, 14, 4); }
+  x.fillStyle = '#e5e7eb'; x.fillRect(0, 30, 128, 4);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const SIS_TEX = sisDokusu();
+
+// ═══════════ KAYAN YILDIZ (meteor) — ara ara gökyüzünde çizgi ═══════════
+const meteorGrubu = new THREE.Group(); scene.add(meteorGrubu);
+function meteorAt(posYon) {
+  // kamera kuresinin yakininda teget iz: parlayan kafa + iz cizgisi (Line kuyrugu)
+  const yon = posYon || new THREE.Vector3(Math.random()*2-1, Math.random()*0.8+0.15, Math.random()*2-1).normalize();
+  const dik = new THREE.Vector3(Math.random()*2-1, Math.random()*2-1, Math.random()*2-1).normalize()
+    .cross(yon).normalize();
+  const y = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  const kafa = new THREE.Sprite(new THREE.SpriteMaterial({ map: SIS_TEX, color: 0xcfe8ff, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false }));
+  kafa.scale.set(1.6, 1.6, 1); y.add(kafa);
+  const izGeo = new THREE.BufferGeometry();
+  izGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(2*3), 3));
+  const iz = new THREE.Line(izGeo, new THREE.LineBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: .8, blending: THREE.AdditiveBlending }));
+  meteorGrubu.add(y); meteorGrubu.add(iz);
+  return { y, iz, izGeo, t: 0, omur: 0.9 + Math.random()*0.8, yon, dik, hiz: 38 + Math.random()*30 };
+}
+let meteorlar = [], meteorZaman = 0;
+function meteorlarGuncelle(dt, camYon) {
+  meteorZaman -= dt;
+  if (meteorZaman <= 0 && meteorlar.length < 2 && Math.random() < 0.55) {
+    meteorZaman = 4 + Math.random()*9;                      // 4-13 sn'de bir deneme
+    // kamera bakisina yakin bolgede baslat
+    const r = camYon.clone().addScaledVector(new THREE.Vector3(Math.random()*2-1, Math.random()*2-1, Math.random()*2-1), 0.45).normalize();
+    meteorlar.push(meteorAt(r));
+  }
+  for (let i = meteorlar.length-1; i >= 0; i--) {
+    const m = meteorlar[i]; m.t += dt;
+    const p = m.yon.clone().multiplyScalar(70)
+      .addScaledVector(m.dik, (m.t/m.omur) * m.hiz)
+      .addScaledVector(m.yon, (m.t/m.omur) * m.hiz * 0.35);
+    m.y.position.copy(p);
+    const kuyruk = p.clone().addScaledVector(m.dik, -6).addScaledVector(m.yon, -2.2);
+    const arr = m.izGeo.attributes.position.array;
+    arr[0]=p.x; arr[1]=p.y; arr[2]=p.z; arr[3]=kuyruk.x; arr[4]=kuyruk.y; arr[5]=kuyruk.z;
+    m.izGeo.attributes.position.needsUpdate = true;
+    const s = 1 - m.t/m.omur;
+    m.y.material.opacity = s; m.y.children[0].material.opacity = s*0.9;
+    m.iz.material.opacity = s*0.75;
+    if (m.t >= m.omur) {
+      meteorGrubu.remove(m.y); meteorGrubu.remove(m.iz);
+      m.y.geometry.dispose(); m.izGeo.dispose();
+      meteorlar.splice(i, 1);
+    }
+  }
+}
+
+// ═══════════ GÜNEŞ PARLAMA / PATLAMA ═══════════
+const parlamalar = [];
+function güneşParlamaEkle() {
+  // güneş yüzeyine sabitlenmis sprite (ekvator kuşaginda rastgele boylam)
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: SIS_TEX, color: 0xffe08a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
+  const boy = (Math.random()*160-80), enlem = (Math.random()*50-25);
+  s.userData.boy = RAD(boy); s.userData.enlem = RAD(enlem);
+  sunMesh.add(s);
+  parlamalar.push({ s, t: 0, omur: 1.6 + Math.random()*2.4, zirve: 0.35 + Math.random()*0.5 });
+}
+function güneşParlamalarGuncelle(dt) {
+  if (Math.random() < dt/2.6) güneşParlamaEkle();           // ort. ~2.6 sn'de bir
+  for (let i = parlamalar.length-1; i >= 0; i--) {
+    const p = parlamalar[i]; p.t += dt;
+    const e = p.t/p.omur;
+    // yumusak sekme: hizli artis, yavas dusus
+    p.s.material.opacity = e < 0.25 ? (e/0.25)*p.zirve : p.zirve * Math.pow(1-(e-0.25)/0.75, 2);
+    const r = 4.55;
+    p.s.position.set(Math.cos(p.s.userData.enlem)*Math.cos(p.s.userData.boy + performance.now()*0.00002)*r,
+                     Math.sin(p.s.userData.enlem)*r,
+                     Math.cos(p.s.userData.enlem)*Math.sin(p.s.userData.boy + performance.now()*0.00002)*r);
+    const buyume = 2.5 + 5*p.zirve*(e < 0.25 ? e/0.25 : 1);
+    p.s.scale.set(buyume, buyume, 1);
+    if (e >= 1) { sunMesh.remove(p.s); p.s.material.dispose(); parlamalar.splice(i, 1); }
+  }
+}
 
 // ═══════════ AY ═══════════
 // Ay, gokyuzu motoruyla GERCEK RA/Dec konumuna oturtulur (ephemeris.json).
@@ -343,6 +439,7 @@ function issUygula() {
     -Math.cos(φ) * Math.sin(λ)
   ).multiplyScalar(ISS_YORUNGE + .015);
   issDot.lookAt(0, 0, 0);
+  issDot.rotateZ(tMin * 0.9);   // govde kendi ekseninde yava doner (canli his)
   return { lat, lon: lonN };
 }
 
@@ -442,7 +539,8 @@ $('Latmo').onchange    = e => { atmos.visible = e.target.checked; };
 // gokyuzu katmanlari (motor yukleninceye kadar bos — katmanSenkron her turda idempotent)
 let Llabels_senkron = null;
 function katmanSenkron() {
-  if (samanyolu) samanyolu.visible = $('Lmw').checked;
+  if (samanyolu) { samanyolu.visible = $('Lmw').checked; if (samanyolu.userData.sis) samanyolu.userData.sis.visible = $('Lmw').checked; }
+  if (skyDome) skyDome.visible = $('Lmw').checked;
   if (consLines) consLines.visible = $('Lcons').checked;
   if (etiketGrubu) etiketGrubu.visible = $('Llabels').checked;
   gezegenGrubu.children.forEach(m => { m.visible = $('Lplanets').checked; if (m.userData.etiket) m.userData.etiket.visible = $('Llabels').checked; });
@@ -492,6 +590,17 @@ function ephRA(EPHEM_ad, d) {
 // gokyuzu nesne bildirimi (boslukta bekler, veri gelince dolar)
 let yildizGercek = null, samanyolu = null, consLines = null, etiketGrubu = null;
 const gezegenGrubu = new THREE.Group(); skyGroup.add(gezegenGrubu);   // gezegenler de gokcercevesinde
+// Gercek Samanyolu fotografi: SSS equirect panorama, gokyuzu kubbesi olarak (Lmw katmani)
+let skyDome = null;
+loader.load('dokular/mw_bg.jpg', tx => {
+  tx.colorSpace = THREE.SRGBColorSpace;
+  skyDome = new THREE.Mesh(new THREE.SphereGeometry(230, 96, 48),
+    new THREE.MeshBasicMaterial({ map: tx, side: THREE.BackSide }));
+  skyGroup.add(skyDome);
+  skyDome.rotation.y = Math.PI;      // GC gorsel merkezde; yon ayari test ile
+  skyDome.userData.gizleOnce = true; // senkron ilk turda Lmw'ye gore karar verir
+  katmanSenkron();
+});
 // JPL efemerisi + tum gok verisini paralel indir
 fetch(D+'ephemeris.json').then(r => r.ok ? r.json() : null).then(j => { if (j) ephAldi(j); }).catch(() => {});
 // yukleyiciler modül TAMAM BİTTİKTEN sonra başlar (asenkron başlangıç → TDZ yok:
@@ -526,23 +635,66 @@ async function gokYuzunuYukle() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    yildizGercek = new THREE.Points(g, new THREE.PointsMaterial({ size: 2.2, vertexColors: true, sizeAttenuation: false, transparent: true, opacity: .95 }));   // sabit piksel boyutu: 300birim uzaklikta attenuation ile gorunmez oluyordu
+    yildizGercek = new THREE.Points(g, new THREE.PointsMaterial({ size: 2.2, vertexColors: true, sizeAttenuation: false, transparent: true, opacity: .95, map: SIS_TEX, alphaTest: 0.04 }));
+    // yildiz titremesi: her yildiza faz + hiz; shader'da parlayip soner
+    { const faz = new Float32Array(n); for (let i = 0; i < n; i++) faz[i] = Math.random()*Math.PI*2;
+      g.setAttribute('faz', new THREE.BufferAttribute(faz, 1)); }
+    yildizGercek.material.onBeforeCompile = sh => {
+      sh.uniforms.zaman = { value: 0 };
+      yildizGercek.userData.shader = sh;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float faz; uniform float zaman; varying float vTitre;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTitre = 0.72 + 0.28 * sin(zaman * (0.7 + 2.6 * fract(faz * 7.13)) + faz * 9.7);');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vTitre;')
+        .replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( diffuse * vTitre, opacity * (0.55 + 0.45 * vTitre) );');
+    };
     skyGroup.add(yildizGercek);
   }
-  // 2) Samanyolu bandi (noksa bulutu)
+  // 2) Samanyolu bandi (yogunluk-kodlu noksa bulutu — yeni mw.bin: u16 ra, i16 dec, u8 yog)
   const mb = await bufGet(D+'mw.bin');
   if (mb) {
     const dv = new DataView(mb), n = dv.getUint32(0, true);
-    const pos = new Float32Array(n*3);
+    const pos = new Float32Array(n*3), col = new Float32Array(n*3);
     for (let i = 0; i < n; i++) {
-      const o = 4 + i*4;
+      const o = 4 + i*5;
       const v = skyDir(dv.getUint16(o, true)/100 - 180, dv.getInt16(o+2, true)/100, 92);
       pos[i*3] = v.x; pos[i*3+1] = v.y; pos[i*3+2] = v.z;
+      const y = dv.getUint8(o+4)/255;                       // bant merkezine yakinlik
+      // sicak-sofuk karisimi: merkez krem-beyaz, kenarlar mavi-mor
+      col[i*3] = 0.55 + y*0.45; col[i*3+1] = 0.62 + y*0.33; col[i*3+2] = 1.0 - y*0.18;
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    samanyolu = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xbfd0ff, size: 2.8, transparent: true, opacity: 0.20, sizeAttenuation: false, blending: THREE.AdditiveBlending, depthWrite: false }));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    samanyolu = new THREE.Points(g, new THREE.PointsMaterial({
+      size: 2.4, vertexColors: true, transparent: true, opacity: 0.62, sizeAttenuation: false,
+      blending: THREE.AdditiveBlending, depthWrite: false, map: sisDokusu(), alphaTest: 0.02 }));
     skyGroup.add(samanyolu);
+    // sis katmani: bant boyunca buyuk yumusak lekeler → "isildayan sütun" hissi
+    // galaktik→ekvatoral: J2000 rotasyon matrisi satirlari (Meeus 13.5 ile birebir)
+    { const M = 700, mp = new Float32Array(M*3), mc = new Float32Array(M*3);
+      const rnd = (() => { let s = 987654321; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
+      const M11=-0.0548755604, M12=-0.8734370902, M13=-0.4838350155,
+            M21= 0.4941094279, M22=-0.4448296300, M23= 0.7469822445,
+            M31=-0.8676661490, M32=-0.1980763734, M33= 0.4559837762;
+      for (let i = 0; i < M; i++) {
+        let l = rnd() * Math.PI * 2;
+        if (rnd() < 0.45) l = 4.66 + (rnd()+rnd()+rnd()-1.5) * 0.9;   // GC+IC kusak agirlikli (l~267°±26°)
+        const cb = Math.cos(b), gx = cb*Math.cos(l), gy = cb*Math.sin(l), gz = Math.sin(b);
+        const ex = M11*gx + M12*gy + M13*gz, ey = M21*gx + M22*gy + M23*gz, ez = M31*gx + M32*gy + M33*gz;
+        const R = 92, gc = 0.55 + 0.45 * Math.exp(-Math.abs(b) * 38);   // merkez daha parlak
+        mp[i*3] = ex*R; mp[i*3+1] = ey*R; mp[i*3+2] = ez*R;
+        mc[i*3] = gc*0.85; mc[i*3+1] = gc*0.9; mc[i*3+2] = gc;
+      }
+      const mg = new THREE.BufferGeometry();
+      mg.setAttribute('position', new THREE.BufferAttribute(mp, 3));
+      mg.setAttribute('color', new THREE.BufferAttribute(mc, 3));
+      const sisMesh = new THREE.Points(mg, new THREE.PointsMaterial({
+        size: 220, vertexColors: true, transparent: true, opacity: 0.085, sizeAttenuation: false,
+        blending: THREE.AdditiveBlending, depthWrite: false, map: sisDokusu() }));
+      samanyolu.userData.sis = sisMesh; skyGroup.add(sisMesh);
+    }
   }
   // 3) takım yıldızı çizgileri
   const cb = await bufGet(D+'conlines.bin');
@@ -599,6 +751,10 @@ function buildEtiketler() {
   const sm = new THREE.Sprite(new THREE.SpriteMaterial({ map: smtx, transparent: true, opacity: .55, depthWrite: false }));
   sm.position.copy(skyDir(266.4, -29, 90)); sm.scale.set(9, 2.2, 1); grp.add(sm);
   etiketGrubu = grp; skyGroup.add(grp);
+  if (skyDome) {                       // gercek foto var: nokta/sis bantlarini soldur
+    if (samanyolu) samanyolu.material.opacity = 0.18;
+    if (samanyolu && samanyolu.userData.sis) samanyolu.userData.sis.material.opacity = 0.03;
+  }
   if (Llabels_senkron) Llabels_senkron();
 }
 
@@ -1041,7 +1197,8 @@ function enParlakGezegen() {
   }
   return en;
 }
-document.querySelectorAll('#panel .fly').forEach(el => el.onclick = () => {
+document.querySelectorAll('#panel .fly').forEach(el => el.onclick = (ev) => {
+  ev.preventDefault(); ev.stopPropagation();   // label tıklaması katmanı açıp kapatmasın (📍 etiket İÇİNDE)
   if (flyAnim) return;
   const t = el.dataset.fly;
   if (t === 'moon') flyToTarget(worldPos(moon), 1.8);
@@ -1103,6 +1260,10 @@ function animate() {
       : `🛰️ ISS: ${Math.abs(iss.lat).toFixed(1)}°${iss.lat>=0?'N':'S'} ${Math.abs(iss.lon).toFixed(1)}°${iss.lon>=0?'E':'W'} · ${iss.lat > 36 && iss.lat < 42 && iss.lon > 26 && iss.lon < 45 ? 'over Türkiye now' : 'outside Türkiye'}`;
   }
   netlikGozet();   // zoom netligi: kamera durunca bolgesel yuksek cozunur ceker
+  // gokyuzu efektleri: yildiz titremesi + kayan yildiz + gunes parlamasi
+  if (yildizGercek && yildizGercek.userData.shader) yildizGercek.userData.shader.uniforms.zaman.value += dt;
+  { const cy = new THREE.Vector3(); camera.getWorldDirection(cy); meteorlarGuncelle(dt * (1 + speedX*0.002), cy); }
+  güneşParlamalarGuncelle(dt);
   if (!flyAnim) controls.update();
   reticle.quaternion.copy(camera.quaternion); // ekran-düzlem hedef halkası
   renderer.render(scene, camera);
@@ -1132,6 +1293,7 @@ window.__D = () => ({ cam: camera.position.length().toFixed(2), merkez: merkeziE
   netMesh: !!netMesh && netMesh.visible, netDurum: document.getElementById('netDurum').textContent,
   yildiz: !!yildizGercek && yildizGercek.visible, skyRot: skyGroup.rotation.y.toFixed(2),
   ayWorld: moon.getWorldPosition(new THREE.Vector3()).toArray().map(x => +x.toFixed(1)),
+  skyDome: !!skyDome && skyDome.visible, domeR: 230,
   gez: gezegenGrubu.children.length, satlink: starlinkNoktalar ? starlinkNoktalar.geometry.drawRange.count : -1,
   karo: document.querySelectorAll('#arsiv .karo').length });
 window.__T = () => { try {
