@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -76,12 +76,12 @@ body.kapali #panelKatk { display: block; }
 <div id="crosshair"></div>
 <div id="ring"><i class="t"></i><i class="b"></i></div>
 <div id="ui">
-  <h1>🌍 DÜNYA — UZAYDAN</h1>
-  <p>sürükle döndür · scroll yakınlaş · R sıfırla · G güneş kadrajda</p>
+  <h1 id="uiBaslik">🌍 EARTH — FROM SPACE</h1>
+  <p id="uiIpucu">drag to rotate · scroll to zoom · R reset · G frames the Sun</p>
 </div>
 <div id="info">
-  Doku: NASA (three.js örnek kütüphanesi) · Hava: Open-Meteo (gerçek veri)<br>
-  Güneş gerçek saatine göre hareket eder · ölçekler gösteri için sıkıştırıldı<br>
+  <span id="infoSatir1">Textures: NASA · Weather: Open-Meteo (live data)</span><br>
+  <span id="infoSatir2">The Sun moves with real local time · distances/sizes compressed for display</span><br>
   <span id="issbilgi">🛰️ ISS: hesaplanıyor…</span>
 </div>
 <div id="timebar">
@@ -94,36 +94,36 @@ body.kapali #panelKatk { display: block; }
 </div>
 <div id="panel">
   <button class="tbtn" id="katlaBtn" style="float:right;padding:2px 7px" title="Paneli kapat (P)">✕</button>
-  <h2>🌐 <span data-tr="DİL" data-en="LANGUAGE">DİL</span></h2>
+  <h2>🌐 <span data-tr="DİL" data-en="LANGUAGE">LANGUAGE</span></h2>
   <div id="dilRow">
     <button class="tbtn sel" id="dilTR">🇹🇷 Türkçe</button>
     <button class="tbtn" id="dilEN">🇬🇧 English</button>
   </div>
-  <h2>🔍 <span data-tr="KONUM" data-en="LOCATION">KONUM</span></h2>
+  <h2>🔍 <span data-tr="KONUM" data-en="LOCATION">LOCATION</span></h2>
   <div id="go"><input id="q" placeholder="şehir / ülke ara…" autocomplete="off"><button class="tbtn" id="qgo" data-tr="Git" data-en="Go">Git</button></div>
-  <div style="margin-top:5px"><button class="tbtn" id="trbtn" style="width:100%"><span data-tr="🇹🇷 Türkiye'ye yaklaş" data-en="🇹🇷 Fly to Türkiye">🇹🇷 Türkiye'ye yaklaş</span></button></div>
-  <div style="margin-top:4px"><button class="tbtn" id="geobtn" style="width:100%"><span data-tr="📍 Konumuma git" data-en="📍 My location">📍 Konumuma git</span></button></div>
-  <h2>🛰️ <span data-tr="TARİHLİ UYDU GÖRÜNTÜSÜ" data-en="HISTORICAL SATELLITE IMAGERY">TARİHLİ UYDU GÖRÜNTÜSÜ</span></h2>
+  <div style="margin-top:5px"><button class="tbtn" id="trbtn" style="width:100%"><span data-tr="🇹🇷 Türkiye'ye yaklaş" data-en="🇹🇷 Fly to Türkiye">🇹🇷 Fly to Türkiye</span></button></div>
+  <div style="margin-top:4px"><button class="tbtn" id="geobtn" style="width:100%"><span data-tr="📍 Konumuma git" data-en="📍 My location">📍 My location</span></button></div>
+  <h2>🛰️ <span data-tr="TARİHLİ UYDU GÖRÜNTÜSÜ" data-en="HISTORICAL SATELLITE IMAGERY">HISTORICAL SATELLITE IMAGERY</span></h2>
   <div id="tarihKut"><input type="date" id="tarih" min="2001-02-24"><button class="tbtn" id="tgit" data-tr="Giyme" data-en="Apply">Giyme</button><button class="tbtn" id="ttes" title="NASA standart dokuya dön">✕</button></div>
   <div id="arsSec"><select id="arsYil"></select><select id="arsAy"></select><span id="arsNot" style="font-size:8.5px;opacity:.6"></span></div>
-  <div id="tarihDurum" style="font-size:9.5px;opacity:.7;margin-top:3px">NASA GIBS arşivi — son 8 gün, kareye tıkla giydir</div>
+  <div id="tarihDurum" style="font-size:9.5px;opacity:.7;margin-top:3px">NASA GIBS archive — last 8 days, click a frame</div>
   <div id="arsiv"></div>
-  <h2>🗂 <span data-tr="KATMANLAR" data-en="LAYERS">KATMANLAR</span></h2>
-  <label><input type="checkbox" id="Ltargets"><span data-tr="🎯 Hedef nişangahı" data-en="🎯 Target reticle">🎯 Hedef nişangahı</span></label>
-  <label><input type="checkbox" id="Llights" checked><span data-tr="🌃 Gece şehir ışıkları" data-en="🌃 Night city lights">🌃 Gece şehir ışıkları</span></label>
-  <label><input type="checkbox" id="Lclouds" checked><span data-tr="🌫️ Bulutlar" data-en="🌫️ Clouds">🌫️ Bulutlar</span></label>
-  <label><input type="checkbox" id="Lsun" checked><span data-tr="☀️ Güneş diski" data-en="☀️ Sun disk">☀️ Güneş diski</span></label>
-  <label><input type="checkbox" id="Lmoon" checked><span data-tr="🌙 Ay (gerçek konum)" data-en="🌙 Moon (real position)">🌙 Ay (gerçek konum)</span><i class="fly" data-fly="moon" title="Ayın üstüne git">📍</i></label>
-  <label><input type="checkbox" id="Liss" checked><span data-tr="🛰️ ISS yörüngesi (SGP4)" data-en="🛰️ ISS orbit (SGP4)">🛰️ ISS yörüngesi (SGP4)</span><i class="fly" data-fly="iss" title="ISS'in üstüne git">📍</i></label>
-  <label><input type="checkbox" id="Lstarlink" checked><span data-tr="📡 Starlink (240 uydu)" data-en="📡 Starlink (240 sats)">📡 Starlink (240 uydu)</span><i class="fly" data-fly="starlink" title="Starlink kümesine git">📍</i></label>
-  <label><input type="checkbox" id="Lplanets" checked><span data-tr="🪐 Gezegenler + gökyüzü motoru" data-en="🪐 Planets + sky engine">🪐 Gezegenler + gökyüzü motoru</span><i class="fly" data-fly="planets" title="En parlak gezegene git">📍</i></label>
-  <label><input type="checkbox" id="Lstars" checked><span data-tr="⭐ Gerçek yıldızlar (5044)" data-en="⭐ Real stars (5044)">⭐ Gerçek yıldızlar (5044)</span></label>
-  <label><input type="checkbox" id="Lmw" checked><span data-tr="🌌 Samanyolu bandı" data-en="🌌 Milky Way band">🌌 Samanyolu bandı</span><i class="fly" data-fly="mw" title="Galaktik merkeze bak">📍</i></label>
-  <label><input type="checkbox" id="Lcons" checked><span data-tr="✴️ Takımyıldız çizgileri" data-en="✴️ Constellation lines">✴️ Takımyıldız çizgileri</span><i class="fly" data-fly="oriyon" title="Orion'a bak">📍</i></label>
-  <label><input type="checkbox" id="Llabels" checked><span data-tr="🏷️ Yıldız/takım adları" data-en="🏷️ Star/constellation names">🏷️ Yıldız/takım adları</span></label>
-  <label><input type="checkbox" id="Latmo" checked><span data-tr="✨ Atmosfer halesi" data-en="✨ Atmosphere glow">✨ Atmosfer halesi</span></label>
-  <label><input type="checkbox" id="Lwx" checked><span data-tr="🌦️ Hava paneli" data-en="🌦️ Weather panel">🌦️ Hava paneli</span></label>
-  <label><input type="checkbox" id="Lzoom" checked><span data-tr="🔬 Zoom netliği (canlı NASA)" data-en="🔬 Zoom sharpness (live NASA)">🔬 Zoom netliği (canlı NASA)</span></label>
+  <h2>🗂 <span data-tr="KATMANLAR" data-en="LAYERS">LAYERS</span></h2>
+  <label><input type="checkbox" id="Ltargets"><span data-tr="🎯 Hedef nişangahı" data-en="🎯 Target reticle">🎯 Target reticle</span></label>
+  <label><input type="checkbox" id="Llights" checked><span data-tr="🌃 Gece şehir ışıkları" data-en="🌃 Night city lights">🌃 Night city lights</span></label>
+  <label><input type="checkbox" id="Lclouds" checked><span data-tr="🌫️ Bulutlar" data-en="🌫️ Clouds">🌫️ Clouds</span></label>
+  <label><input type="checkbox" id="Lsun" checked><span data-tr="☀️ Güneş diski" data-en="☀️ Sun disk">☀️ Sun disk</span></label>
+  <label><input type="checkbox" id="Lmoon" checked><span data-tr="🌙 Ay (gerçek konum)" data-en="🌙 Moon (real position)">🌙 Moon (real position)</span><i class="fly" data-fly="moon" title="Ayın üstüne git">📍</i></label>
+  <label><input type="checkbox" id="Liss" checked><span data-tr="🛰️ ISS yörüngesi (SGP4)" data-en="🛰️ ISS orbit (SGP4)">🛰️ ISS orbit (SGP4)</span><i class="fly" data-fly="iss" title="ISS'in üstüne git">📍</i></label>
+  <label><input type="checkbox" id="Lstarlink" checked><span data-tr="📡 Starlink (240 uydu)" data-en="📡 Starlink (240 sats)">📡 Starlink (240 sats)</span><i class="fly" data-fly="starlink" title="Starlink kümesine git">📍</i></label>
+  <label><input type="checkbox" id="Lplanets" checked><span data-tr="🪐 Gezegenler + gökyüzü motoru" data-en="🪐 Planets + sky engine">🪐 Planets + sky engine</span><i class="fly" data-fly="planets" title="En parlak gezegene git">📍</i></label>
+  <label><input type="checkbox" id="Lstars" checked><span data-tr="⭐ Gerçek yıldızlar (5044)" data-en="⭐ Real stars (5044)">⭐ Real stars (5044)</span></label>
+  <label><input type="checkbox" id="Lmw" checked><span data-tr="🌌 Samanyolu bandı" data-en="🌌 Milky Way band">🌌 Milky Way band</span><i class="fly" data-fly="mw" title="Galaktik merkeze bak">📍</i></label>
+  <label><input type="checkbox" id="Lcons" checked><span data-tr="✴️ Takımyıldız çizgileri" data-en="✴️ Constellation lines">✴️ Constellation lines</span><i class="fly" data-fly="oriyon" title="Orion'a bak">📍</i></label>
+  <label><input type="checkbox" id="Llabels" checked><span data-tr="🏷️ Yıldız/takım adları" data-en="🏷️ Star/constellation names">🏷️ Star/constellation names</span></label>
+  <label><input type="checkbox" id="Latmo" checked><span data-tr="✨ Atmosfer halesi" data-en="✨ Atmosphere glow">✨ Atmosphere glow</span></label>
+  <label><input type="checkbox" id="Lwx" checked><span data-tr="🌦️ Hava paneli" data-en="🌦️ Weather panel">🌦️ Weather panel</span></label>
+  <label><input type="checkbox" id="Lzoom" checked><span data-tr="🔬 Zoom netliği (canlı NASA)" data-en="🔬 Zoom sharpness (live NASA)">🔬 Zoom sharpness (live NASA)</span></label>
   <div id="netDurum"></div>
   <div id="wx"></div>
 </div>
@@ -775,8 +775,9 @@ async function gezegenleriYukle() {
     m.userData = p;
     // isim etiketi (cocuk) — 🏷️ katmaniyla acilip kapanir
     const ltx = kanvasEtiket(p.ad === 'Jüpiter' || p.ad === 'Satürn' ? '' : '', 30, '#ffe08a');
-    const lsp = new THREE.Sprite(new THREE.SpriteMaterial({ map: kanvasEtiket(p.ad, 34, '#ffe08a'), transparent: true, opacity: .9, depthWrite: false }));
-    lsp.position.y = p.yari + 0.22; lsp.scale.set(1.15, 0.29, 1);   // ~23 birimden ~40px: okunur, dev degil lsp.userData.etiket = true;
+    const lsp = new THREE.Sprite(new THREE.SpriteMaterial({ map: kanvasEtiket(LANG === 'en' ? p.adEN : p.ad, 34, '#ffe08a'), transparent: true, opacity: .9, depthWrite: false }));
+    lsp.position.y = p.yari + 0.22; lsp.scale.set(1.15, 0.29, 1); m.userData.etiket = lsp;
+    lsp.userData = {};   // dil gecisinde yenilenecek (yildiz/takim etiketleriyle ayni mekanizma) lsp.userData.etiket = true;
     m.add(lsp); m.userData.etiket = lsp;
     if (p.halka) {
       const htx = await new Promise(res => texLoader.load(D + 'saturn_ring.png', res, undefined, () => res(null)));
@@ -856,7 +857,7 @@ $('ttes').onclick = () => { earth.material.map = texLoader.load(T+'earth_atmos_2
 const clockEl = $('clock');
 function saatGöster() {
   const d = simDate();
-  const s = d.toLocaleString('tr-TR', { timeZone: 'UTC', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const s = d.toLocaleString(LANG === 'tr' ? 'tr-TR' : 'en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   clockEl.textContent = `${s} UTC${playing && speedX === 1 ? '' : speedX > 1 ? ` · ×${speedX}` : ' · ⏸'}`;
 }
 $('tpause').onclick = () => { playing = !playing; $('tpause').textContent = playing ? '⏸' : '▶'; saatGöster(); };
@@ -949,7 +950,7 @@ $('geobtn').onclick = () => {
 };
 
 // ═══════════ DİL MOTORU (TR/EN) ═══════════
-let LANG = 'tr';
+let LANG = 'en';   // varsayılan İngilizce; kullanicinin sectigi tercihten okunur (geriye donuk TR)
 const ÇEVİRİ = {
   'şehir / ülke ara…': 'search city / country…',
   'NASA GIBS arşivi — son 8 gün, kareye tıkla giydir': 'NASA GIBS archive — last 8 days, click a frame',
@@ -979,15 +980,27 @@ function dilUygula() {
   if (hintEl) hintEl.innerHTML = LANG === 'tr'
     ? '<b>Sürükle</b> döndür · <b>Teker</b> zoom · <b>R</b> sıfırla · <b>G</b> gündüz/gece · <b>P</b> panel · Gezegene/uydura/Ay\'a <b>tıkla</b> → üstüne gider · Panelde <b>📍</b> aynı işi yapar'
     : '<b>Drag</b> rotate · <b>Wheel</b> zoom · <b>R</b> reset · <b>G</b> day/night · <b>P</b> panel · <b>Click</b> a planet/satellite/Moon → fly to it · Panel <b>📍</b> does the same';
+  document.getElementById('uiBaslik').textContent = LANG === 'tr' ? '🌍 DÜNYA — UZAYDAN' : '🌍 EARTH — FROM SPACE';
+  document.getElementById('uiIpucu').textContent = LANG === 'tr' ? 'sürükle döndür · scroll yakınlaş · R sıfırla · G güneş kadrajda' : 'drag to rotate · scroll to zoom · R reset · G frames the Sun';
+  document.getElementById('infoSatir1').textContent = LANG === 'tr' ? 'Doku: NASA (three.js örnek kütüphanesi) · Hava: Open-Meteo (gerçek veri)' : 'Textures: NASA · Weather: Open-Meteo (live data)';
+  document.getElementById('infoSatir2').textContent = LANG === 'tr' ? 'Güneş gerçek saatine göre hareket eder · ölçekler gösteri için sıkıştırıldı' : 'The Sun moves with real local time · distances/sizes compressed for display';
+  document.title = LANG === 'tr' ? 'Astronot Gözünden Dünya 🌍' : 'Earth From an Astronaut\'s View 🌍';
   arsivRender();
   if (ETIKET_VERISI.takim.length) buildEtiketler();   // takim adlari yeni dilde yeniden
+  gezegenGrubu.children.forEach(m => {   // gezegen isim etiketleri de yeni dilde
+    if (m.userData.etiket && m.userData.adEN) {
+      m.userData.etiket.material.map = kanvasEtiket(LANG === 'en' ? m.userData.adEN : m.userData.ad, 34, '#ffe08a');
+      m.userData.etiket.material.needsUpdate = true;
+    }
+  });
   if (sonKonum && !sonKonum.donmuştü) wxYukle(false);
   if (netDurumGor) netlikYenile();
 }
 const TITLES_TR = { moon:'Ayın üstüne git', iss:'ISS üstüne git', starlink:'En yakın Starlink kümesine git', planets:'Gökyüzünde en parlak gezegen', mw:'Galaktik merkeze git', oriyon:'Orion takım yıldızına git' };
 const TITLES_EN = { moon:'Fly to the Moon', iss:'Fly over the ISS', starlink:'Fly to nearest Starlink cluster', planets:'Fly to brightest planet', mw:'Fly to galactic center', oriyon:'Fly to Orion' };
-document.getElementById('dilTR').onclick = () => { if (LANG !== 'tr') { LANG = 'tr'; dilUygula(); } };
-document.getElementById('dilEN').onclick = () => { if (LANG !== 'en') { LANG = 'en'; dilUygula(); } };
+try { LANG = localStorage.getItem('du-lang') || 'en'; } catch (e) {}
+document.getElementById('dilTR').onclick = () => { if (LANG !== 'tr') { LANG = 'tr'; try { localStorage.setItem('du-lang', 'tr'); } catch (e) {} dilUygula(); } };
+document.getElementById('dilEN').onclick = () => { if (LANG !== 'en') { LANG = 'en'; try { localStorage.setItem('du-lang', 'en'); } catch (e) {} dilUygula(); } };
 
 // ═══════════ TARIHLI UYDU ARSIVI (yil + ay secimi; GIBS: MODIS 2000+, VIIRS 2012+) ═══════════
 // Google Earth "historical imagery" ayni GIBS arsivini kullanir. Her gun tek tek
