@@ -117,6 +117,8 @@ body.kapali #panelKatk { display: block; }
   <label><input type="checkbox" id="Liss" checked><span data-tr="🛰️ ISS yörüngesi (SGP4)" data-en="🛰️ ISS orbit (SGP4)">🛰️ ISS orbit (SGP4)</span><i class="fly" data-fly="iss" title="ISS'in üstüne git">📍</i></label>
   <label><input type="checkbox" id="Lstarlink" checked><span data-tr="📡 Starlink (240 uydu)" data-en="📡 Starlink (240 sats)">📡 Starlink (240 sats)</span><i class="fly" data-fly="starlink" title="Starlink kümesine git">📍</i></label>
   <label><input type="checkbox" id="Lplanets" checked><span data-tr="🪐 Gezegenler + gökyüzü motoru" data-en="🪐 Planets + sky engine">🪐 Planets + sky engine</span><i class="fly" data-fly="planets" title="En parlak gezegene git">📍</i></label>
+  <label><input type="checkbox" id="Lorbit"><span data-tr="🌀 Yörünge Modu (Güneş Sistemi)" data-en="🌀 Orbit Mode (Solar System)">🌀 Orbit Mode (Solar System)</span></label>
+  <div class="note" id="orbitDurum" style="display:none" data-tr="Gerçek hareketler: Dünya kendi ekseninde günde bir döner, Ay Dünya'nın etrafında 27.3 günde, gezegenler gerçek sürelerde (Merkür 88 d, Dünya 365 d, Neptün 165 yıl) Güneş'in etrafında döner. Hareketi görmek için hızı ×3600'e al. (Y tuşu)" data-en="Real motions: Earth spins once/day, Moon orbits Earth in 27.3 d, planets orbit the Sun in real periods (Mercury 88 d, Earth 365 d, Neptune 165 y). Use speed ×3600 to see motion. (Y key)">Real motions: Earth spins once/day, Moon orbits Earth in 27.3 d, planets orbit the Sun in real periods (Mercury 88 d, Earth 365 d, Neptune 165 y). Use speed ×3600 to see motion. (Y key)</div>
   <label><input type="checkbox" id="Lstars" checked><span data-tr="⭐ Gerçek yıldızlar (5044)" data-en="⭐ Real stars (5044)">⭐ Real stars (5044)</span></label>
   <label><input type="checkbox" id="Lmw" checked><span data-tr="🌌 Samanyolu bandı" data-en="🌌 Milky Way band">🌌 Milky Way band</span><i class="fly" data-fly="mw" title="Galaktik merkeze bak">📍</i></label>
   <label><input type="checkbox" id="Lcons" checked><span data-tr="✴️ Takımyıldız çizgileri" data-en="✴️ Constellation lines">✴️ Constellation lines</span><i class="fly" data-fly="oriyon" title="Orion'a bak">📍</i></label>
@@ -154,7 +156,7 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.06;
-controls.minDistance = 1.5; controls.maxDistance = 30; controls.enablePan = false;
+controls.minDistance = 1.5; controls.maxDistance = 30; controls.enablePan = false;   // yorunge modunda limit asagida gevser
 
 // ═══════════ ZAMAN MOTORU ═══════════
 // simMs = gerçek UTC + kullanıcı ofseti (hızlandırılmış timestep destekli)
@@ -413,6 +415,7 @@ const RAD = THREE.MathUtils.degToRad;
 const sunDirWorld = new THREE.Vector3(0,0,1);
 
 function guneşUygula() {
+  if (orbitMode) return;   // yorunge modunda Gunes sistemin merkezindedir
   const { decl, sunLon } = güneşKonumu(simDate());
   lambdaV = hedefLambdaV; // saat kaydırması merkez boylamı değiştirmez
   if (sunEdge && !flyAnim) lambdaV = sunLon - 26; // G modu: gunes kadraj solunda; Dunya aydinlik yari gorunur
@@ -539,6 +542,8 @@ $('Latmo').onchange    = e => { atmos.visible = e.target.checked; };
 // gokyuzu katmanlari (motor yukleninceye kadar bos — katmanSenkron her turda idempotent)
 let Llabels_senkron = null;
 function katmanSenkron() {
+  if (orbitMode) return;   // yorunge modunda uydu katmanlari kapali kalir
+
   if (samanyolu) { samanyolu.visible = $('Lmw').checked; if (samanyolu.userData.sis) samanyolu.userData.sis.visible = $('Lmw').checked; }
   if (skyDome) skyDome.visible = $('Lmw').checked;
   if (consLines) consLines.visible = $('Lcons').checked;
@@ -1090,6 +1095,75 @@ function merkeziEnlemBoylam() {
   let lon = THREE.MathUtils.radToDeg(Math.atan2(-w.z, w.x));   // llToVec eslenimi: lon0 → +X
   return { lat, lon: normalizeLon(lon) };
 }
+// ── ONBELLEK: IndexedDB (blob, tarayici sonrasi) + LRU bellek (texture) ──
+const netHafiza = new Map();               // url -> Texture (en son 16)
+let netIDB = null;
+function idbAc() {
+  return new Promise(res => { try {
+    const r = indexedDB.open('dunya-netlik', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('bloblar');
+    r.onsuccess = () => { netIDB = r.result; res(netIDB); };
+    r.onerror = () => res(null);
+  } catch (e) { res(null); } });
+}
+idbAc();
+function idbKoyma(url, blob) { if (!netIDB) return; try {
+  const tx = netIDB.transaction('bloblar', 'readwrite'); tx.objectStore('bloblar').put(blob, url);
+  tx.oncomplete = () => {                      // 120 MB siniri: asarsa temizle
+    try { const s = netIDB.transaction('bloblar').objectStore('bloblar').getAllKeys();
+      s.onsuccess = () => { if (s.result.length > 80) { const tx2 = netIDB.transaction('bloblar','readwrite');
+        const silinen = s.result.slice(0, s.result.length - 80); const st = tx2.objectStore('bloblar');
+        silinen.forEach(k => st.delete(k)); } };
+    } catch (e) {}
+  };
+} catch (e) {} }
+function idbOkuma(url) { return new Promise(res => { if (!netIDB) return res(null); try {
+  const rq = netIDB.transaction('bloblar').objectStore('bloblar').get(url);
+  rq.onsuccess = () => res(rq.result || null); rq.onerror = () => res(null);
+} catch (e) { res(null); } }); }
+async function resimliGetir(url) {
+  const cached = idbOkuma(url);              // once IDB'ye sor (blob beklet, await et)
+  const memory = netHafiza.get(url);
+  if (memory) return memory;
+  const blob = await cached;
+  try {
+    const img = blob ? await createImageBitmap(blob) : await new Promise((res, rej) => {
+      const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => rej(new Error('gibssiz')); im.src = url; });
+    if (!blob) { try { const b = await (await fetch(url)).blob(); idbKoyma(url, b); } catch (e) {} }
+    const tex = new THREE.Texture(img); tex.colorSpace = THREE.SRGBColorSpace;
+    tex.flipY = false;                        // GEOMETRI v=0 = KUZEY; GIBS satir 0 da kuzey → flip YASAK (terslik buradaydi)
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); tex.needsUpdate = true;
+    netHafiza.set(url, tex);
+    while (netHafiza.size > 16) { const eski = netHafiza.entries().next().value; netHafiza.delete(eski[0]); }
+    return tex;
+  } catch (e) { return null; }
+}
+function kubbeKur(tex, lat1, lat2, lon1, lon2) {
+  const Rk = 1.004, AD = 96;
+  const gp = [], gu = [], gi = [];
+  for (let j = 0; j <= AD; j++) {
+    const lat = lat2 - (lat2 - lat1) * (j / AD);            // v=0 → lat2 (kuzey = doku ilk satir)
+    for (let i = 0; i <= AD; i++) {
+      const lon = lon1 + (lon2 - lon1) * (i / AD);
+      const v = llToVec(lat, lon, Rk);
+      gp.push(v.x, v.y, v.z); gu.push(i / AD, j / AD);
+    }
+  }
+  for (let j = 0; j < AD; j++) for (let i = 0; i < AD; i++) {
+    const a = j*(AD+1)+i, b = a+1, c = a+(AD+1), d = c+1;
+    gi.push(a, c, b, b, c, d);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(gu, 2));
+  geo.setIndex(gi); geo.computeVertexNormals();
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.004, side: THREE.FrontSide });
+  if (netMesh) { earthGroup.remove(netMesh); netMesh.geometry.dispose(); const eskiT = netMesh.material.map; netMesh.material.dispose(); if (eskiT && ![...netHafiza.values()].includes(eskiT)) eskiT.dispose(); }
+  netMesh = new THREE.Mesh(geo, mat);
+  netMesh.renderOrder = 5; netMesh.raycast = () => {};
+  earthGroup.add(netMesh);
+}
+let netIptal = null;
 async function netlikYenile() {
   if (!$('Lzoom').checked) return;
   const mesafe = camera.position.length();
@@ -1097,60 +1171,49 @@ async function netlikYenile() {
   const yari = netlikIhtiyac();
   const mer = merkeziEnlemBoylam();
   if (!mer) return;
+  if (netIptal) netIptal.cancelled = true;
+  const ben = netIptal = { cancelled: false };
   const lat1 = Math.max(-85, mer.lat - yari), lat2 = Math.min(85, mer.lat + yari);
   const lon1 = Math.max(-179.9, mer.lon - yari * 1.9), lon2 = Math.min(179.9, mer.lon + yari * 1.9);
-  const px = 3072, orans = (lon2 - lon1) / Math.max(0.1, lat2 - lat1);
-  const wPx = px, hPx = Math.round(px / orans);
-  const url = `${GIBS}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&CRS=EPSG:4326&BBOX=${lat1.toFixed(2)},${lon1.toFixed(2)},${lat2.toFixed(2)},${lon2.toFixed(2)}&WIDTH=${wPx}&HEIGHT=${hPx}&FORMAT=image/jpeg&LAYERS=${gibsKatman(netTarih())}&TIME=${netTarih()}`;
-  $('netDurum').textContent = LANG === 'tr' ? '🔬 Bölgesel yüksek çözünürlük indiriliyor…' : '🔬 Fetching high-res region…';
-  try {
-    const img = await new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => rej(new Error('gibssiz')); im.src = url; });
-    if (netBekle) clearTimeout(netBekle);
-    netBekle = setTimeout(() => netlikYenile(), 1200);   // kameranin son konumunu esas al
-    const tex = new THREE.Texture(img); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); tex.needsUpdate = true;
-    // Kesin esleme: SphereGeometry'nin phi/theta varsayimi yerine llToVec ile uretilen
-    // prosedurel kubbe — doku pikselleri BBOX ile birebir hizali kalir.
-    const Rk = 1.004, AD = 96;   // kuzey-guney x dogu-bati kotalamasi
-    const gp = [], gu = [], gi = [];
-    for (let j = 0; j <= AD; j++) {
-      const lat = lat2 - (lat2 - lat1) * (j / AD);          // v=0 → lat2 (doku ustu)
-      for (let i = 0; i <= AD; i++) {
-        const lon = lon1 + (lon2 - lon1) * (i / AD);
-        const v = llToVec(lat, lon, Rk);
-        gp.push(v.x, v.y, v.z); gu.push(i / AD, j / AD);
-      }
-    }
-    for (let j = 0; j < AD; j++) for (let i = 0; i < AD; i++) {
-      const a = j*(AD+1)+i, b = a+1, c = a+(AD+1), d = c+1;
-      gi.push(a, c, b, b, c, d);                            // on yuz (dis normal)
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(gu, 2));
-    geo.setIndex(gi); geo.computeVertexNormals();
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.004, side: THREE.FrontSide });
-    if (netMesh) { earthGroup.remove(netMesh); netMesh.geometry.dispose(); netMesh.material.map.dispose(); netMesh.material.dispose(); }
-    netMesh = new THREE.Mesh(geo, mat);
-    netMesh.renderOrder = 5;                      // yuzeyin uzerinde, nisangahin altinda
-    netMesh.raycast = () => {};                   // raycast'i bozmasin
-    earthGroup.add(netMesh);
-    netDurumGor = true;
-    $('netDurum').textContent = LANG === 'tr'
-      ? `🔬 Canlı VIIRS ${wPx}×${hPx}px → ${Math.round(wPx / (lon2 - lon1))} px/°`
-      : `🔬 Live VIIRS ${wPx}×${hPx}px → ${Math.round(wPx / (lon2 - lon1))} px/°`;
-  } catch (e) {
-    $('netDurum').textContent = LANG === 'tr' ? '🔬 Canlı yüksek çözünürlük alınamadı' : '🔬 Live high-res unavailable';
+  const orans = (lon2 - lon1) / Math.max(0.1, lat2 - lat1);
+  // AKILLI COZUNUR: ~220 px/derce yeter; cok yakinlayinca (yari kucuk) KUCUK resim = HIZLI harita modu
+  const hedefPx = Math.max(1024, Math.min(3072, Math.round(yari * 220 / 2) * 2));
+  const hizliPx = Math.min(1024, hedefPx);
+  const urlIcin = (px) => { const h = Math.round(px / orans);
+    return `${GIBS}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&CRS=EPSG:4326&BBOX=${lat1.toFixed(2)},${lon1.toFixed(2)},${lat2.toFixed(2)},${lon2.toFixed(2)}&WIDTH=${px}&HEIGHT=${h}&FORMAT=image/jpeg&LAYERS=${gibsKatman(netTarih())}&TIME=${netTarih()}`; };
+  // ASEM 1: hizli onizleme (1024 veya onbellekten ANINDA)
+  const hizliUrl = urlIcin(hizliPx);
+  let tex = await resimliGetir(hizliUrl);
+  if (ben.cancelled) return;
+  if (tex) kubbeKur(tex, lat1, lat2, lon1, lon2);
+  $('netDurum').textContent = tex ? '🗺️ ' + (LANG==='tr' ? 'harita indiriliyor…' : 'map loading…') : '';
+  // ASEM 2: keskin surum (hedefPx) — ayni kare, yalniz daha buyuk
+  if (hedefPx > hizliPx) {
+    const keskinUrl = urlIcin(hedefPx);
+    const tex2 = await resimliGetir(keskinUrl);
+    if (ben.cancelled) return;
+    if (tex2) { kubbeKur(tex2, lat1, lat2, lon1, lon2); tex = tex2; }
   }
+  if (!tex) { $('netDurum').textContent = LANG === 'tr' ? '🔬 Canlı yüksek çözünürlük alınamadı' : '🔬 Live high-res unavailable'; }
+  else {
+    netDurumGor = true;
+    const kare = tex.image ? (tex.image.width + '×' + tex.image.height) : '';
+    const on = netHafiza.get(hizliUrl) && netHafiza.get(hizliUrl) === tex ? (LANG==='tr'?'♻️ önbellek':'♻️ cached') : (LANG==='tr'?'📡 canlı':'📡 live');
+    $('netDurum').textContent = `🔬 VIIRS ${kare} ${on}`;
+  }
+  if (netBekle) clearTimeout(netBekle);
+  netBekle = setTimeout(() => netlikYenile(), 4000);       // yavas nakil: kamera durunca zaten tetiklenir
 }
 $('Lzoom').onchange = e => { if (!e.target.checked && netMesh) { netMesh.visible = false; $('netDurum').textContent = ''; } else if (e.target.checked) netBekle = setTimeout(() => netlikYenile(), 400); };
 let _netSon = { x: 0, y: 0, z: 0, t: 0 };
 function netlikGozet() {
+  if (orbitMode) { if (netMesh) netMesh.visible = false; $('netDurum').textContent = ''; return; }   // yorunge modunda bolgesel doku yok
   // kamera sabitlendiyse 2sn'de bir tazele; hizli hareketi bekle (debounce 700ms)
   const p = camera.position;
   if (performance.now() - _netSon.t < 350) return;
   const degisti = Math.abs(p.x-_netSon.x) + Math.abs(p.y-_netSon.y) + Math.abs(p.z-_netSon.z);
   _netSon = { x: p.x, y: p.y, z: p.z, t: performance.now() };
-  if (degisti > 0.02) { if (netBekle) clearTimeout(netBekle); netBekle = setTimeout(() => netlikYenile(), 700); }
+  if (degisti > 0.02) { if (netBekle) clearTimeout(netBekle); netBekle = setTimeout(() => netlikYenile(), 500); }
 }
 netlikYenile();
 
@@ -1233,11 +1296,92 @@ document.querySelectorAll('#panel .fly').forEach(el => el.onclick = (ev) => {
 
 // netlikGozet: Zoom-Netligi bloğunda tanimli (debounce'lu) — dublikasyon kaldirildi
 
+// ═══════════ YÖRÜNGE MODU: gerçek Güneş Sistemi hareketleri ═══════════
+// Dünya kendi ekseninde 1 günde döner (23.4° eksen eğikligi), Ay Dünya'nin
+// etrafinda 27.3 günde, gezegenler GERCEK periyotlarda (Merkür 88 d ...
+// Neptün 64.800 d = 165 yil) merkezi Güneş'in etrafinda döner.
+// Yörünge yariçaplari görünüm için logaritmik sikistirildi (gerçek AU çok büyük);
+// periyotlar ve başlangıç boylamlari gerçektir (J2000 ortalama boylamlar).
+let orbitMode = false;
+const GUN_MS = 86400e3, J2000 = Date.UTC(2000, 0, 1, 12);
+const YOR = {   // r: görünüm yarıçapı, T: gün, L0: J2000 boylamı °
+  mer: { r: 26,  T: 87.97,   L0: 252.25 },
+  ven: { r: 38,  T: 224.70,  L0: 181.98 },
+  dunya:{ r: 52,  T: 365.256, L0: 100.46 },
+  mar: { r: 68,  T: 686.98,  L0: 355.45 },
+  jup: { r: 94,  T: 4332.6,  L0: 34.40 },
+  sat: { r: 120, T: 10759.2, L0: 49.94 },
+  ura: { r: 148, T: 30687,   L0: 313.23 },
+  nep: { r: 172, T: 60190,   L0: 304.88 },
+};
+// yörünge halkaları (görünüm)
+const yorHalkalar = new THREE.Group(); yorHalkalar.visible = false; scene.add(yorHalkalar);
+Object.values(YOR).forEach(y => {
+  const pts = []; for (let i = 0; i <= 128; i++) { const a = i / 128 * Math.PI * 2; pts.push(new THREE.Vector3(Math.sin(a)*y.r, 0, Math.cos(a)*y.r)); }
+  yorHalkalar.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x3d5a80, transparent: true, opacity: .4 })));
+});
+const ayHalka = new THREE.Line(new THREE.BufferGeometry().setFromPoints(
+  Array.from({ length: 65 }, (_, i) => { const a = i / 64 * Math.PI * 2; return new THREE.Vector3(Math.sin(a)*6, 0, Math.cos(a)*6); })),
+  new THREE.LineBasicMaterial({ color: 0x8899aa, transparent: true, opacity: .35 }));
+ayHalka.visible = false; earthGroup.add(ayHalka);   // Dünya'yi takip eder
+// yörünge modunda merkez ışığı (Güneş'in kendisi ışık kaynağı olur)
+const orbitLight = new THREE.PointLight(0xfff5e6, 3.2, 0, 0);   // decay 0 → her yere eşit
+scene.add(orbitLight); orbitLight.visible = false;
+
+function solarGuncelle(t) {
+  const gun = (t - J2000) / GUN_MS;                      // J2000'den bu yana gün
+  sunMesh.scale.setScalar(0.45); sunGlow.scale.set(22, 22, 1);   // merkezde kucuk gunes: ic sistem gorunsun
+  skyGroup.rotation.y = 0;                              // gökyüzü bu modda sabit durur
+  sunMesh.position.set(0, 0, 0); sunGlow.position.set(0, 0, 0); orbitLight.position.set(0, 0, 0);
+  // Dünya: yörünge + kendi ekseni (24 saat) + 23.4° eğim
+  const ae = RAD(YOR.dunya.L0) + 2 * Math.PI * gun / YOR.dunya.T;
+  earthGroup.position.set(Math.sin(ae) * YOR.dunya.r, 0, Math.cos(ae) * YOR.dunya.r);
+  earthGroup.rotation.set(RAD(23.4), -2 * Math.PI * gun, 0);   // once 23.4° egim, sonra kendi ekseni
+  // Ay: Dünya'nın etrafında 27.3 gün, 5° eğik
+  const am = 2 * Math.PI * gun / 27.32;
+  moon.position.set(earthGroup.position.x + Math.sin(am) * 6, Math.sin(am) * 0.5, earthGroup.position.z + Math.cos(am) * 6);
+  // Gezegenler: gerçek periyotlarla Güneş'in etrafında
+  gezegenGrubu.children.forEach(m => {
+    const y = YOR[m.userData.anahtar]; if (!y) return;
+    const a = RAD(y.L0) + 2 * Math.PI * gun / y.T;
+    m.position.set(Math.sin(a) * y.r, 0, Math.cos(a) * y.r);
+  });
+}
+
+function orbitAyarla(on) {
+  orbitMode = on; $('Lorbit').checked = on;
+  $('orbitDurum').style.display = on ? '' : 'none';
+  sunLight.visible = !on; orbitLight.visible = on;
+  yorHalkalar.visible = on; ayHalka.visible = on;
+  if (on) {
+    if (flyAnim) flyAnim = null;
+    if (netMesh) netMesh.visible = false; $('netDurum').textContent = '';
+    issDot.visible = issOrbit.visible = false;
+    if (starlinkNoktalar) starlinkNoktalar.visible = false;
+    yorHalkalar.children.forEach(l => l.material.opacity = 0.65);
+    gezegenGrubu.children.forEach(m => { const e = m.userData.etiket; if (e) { e.scale.set(4.2, 1.05, 1); e.visible = $('Llabels').checked; } });
+    controls.maxDistance = 420; controls.target.set(0, 0, 0); camera.position.set(0, 95, 150);
+    if (speedX < 3600) { while (hizIdx < HIZLAR.length - 1 && HIZLAR[hizIdx] < 3600) hizIdx++; speedX = HIZLAR[hizIdx]; $('tspeed').textContent = '×' + speedX; $('tspeed').classList.add('on'); }
+    playing = true; $('tpause').textContent = '⏸';
+    skyGroup.visible = false;   // gok kubbesi/yildizlar sistem olceginde dev gursultu
+  } else {
+    earthGroup.position.set(0, 0, 0); earthGroup.rotation.set(0, 0, 0);
+    sunMesh.scale.setScalar(1); sunGlow.scale.set(52, 52, 1);   // eski gosterim olcegi geri
+    yorHalkalar.children.forEach(l => l.material.opacity = 0.4);
+    gezegenGrubu.children.forEach(m => { const e = m.userData.etiket; if (e) e.scale.set(1.15, 0.29, 1); });
+    controls.maxDistance = 30; controls.target.set(0, 0, 0); camera.position.set(0, 0, 4.2);
+    skyGroup.visible = true;
+    katmanSenkron(); guneşUygula();
+  }
+}
+$('Lorbit').onchange = e => orbitAyarla(e.target.checked);
+
 // ═══════════ R / G ═══════════
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
   if (e.key === 'r' || e.key === 'R') { camera.position.set(0,0,4.2); controls.target.set(0,0,0); controls.update(); }
   if (e.key === 'g' || e.key === 'G') { sunEdge = !sunEdge; if (flyAnim) flyAnim = null; controls.enabled = true; }
+  if (e.key === 'y' || e.key === 'Y') { if (orbitMode) { orbitAyarla(false); } else { orbitAyarla(true); } }
 });
 let sunEdge = false;
 
@@ -1256,7 +1400,8 @@ function animate() {
   const iss = issUygula(); // ISS haritada sürekli yürür
   // ── GÖKYÜZÜ MOTORU ── gokyuzu cercevesi gercek donusuyla cevrilir; Ay + gezegenler
   // JPL efemerisi RA/Dec ile guncellenir (Dunya'yu perdeleyen sabit Ay duzeldi)
-  skyGroup.rotation.y = RAD((GMST0 - gmstDeg(simDate())) % 360) - RAD(lambdaV);
+  if (orbitMode) { solarGuncelle(simDate()); }
+  else skyGroup.rotation.y = RAD((GMST0 - gmstDeg(simDate())) % 360) - RAD(lambdaV);
   if (EPHEM) {
     const ayP = ephRA('moon', simDate());
     if (ayP) moon.position.copy(skyDir(ayP.ra, ayP.dec, 46));   // r=46: ~2.4° gorunen cap — Yeni Ay civarinda Gunes'i kapatmaz
@@ -1309,6 +1454,9 @@ window.__D = () => ({ cam: camera.position.length().toFixed(2), merkez: merkeziE
   skyDome: !!skyDome && skyDome.visible, domeR: 230,
   gez: gezegenGrubu.children.length, satlink: starlinkNoktalar ? starlinkNoktalar.geometry.drawRange.count : -1,
   karo: document.querySelectorAll('#arsiv .karo').length });
+window.__SCN = () => scene.children.filter(c => c.visible).map(c => {
+  const p = c.getWorldPosition(new THREE.Vector3()), s = c.getWorldScale(new THREE.Vector3());
+  return (c.type) + (c.material && c.material.map ? '[tex]' : '') + ' p:[' + p.toArray().map(x => x.toFixed(0)) + '] s:' + s.x.toFixed(1); });
 window.__T = () => { try {
   const r = { tle: !!TLE, tleN: TLE ? TLE.s.length : -1, satlib: typeof window.satellite };
   try { const rec = satellite.twoline2satrec(TLE.s[0].l1, TLE.s[0].l2); r.ornek = satPos(rec, new Date()); } catch (e) { r.hata = e.message; }
