@@ -238,7 +238,7 @@ scene.add(new THREE.AmbientLight(0x0a1020, 0.35));
 
 const sunTex = loader.load('dokular/sun.jpg'); sunTex.colorSpace = THREE.SRGBColorSpace;   // gercek Solar Dynamics görünümü (D sabiti henüz tanımsız — literal yol)
 const sunMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(4.5, 48, 24),
+  new THREE.SphereGeometry(8, 48, 24),   // gosterim olcegi: r130'da ekranda ~90px disk (G kadrajda iken)
   new THREE.MeshBasicMaterial({ map: sunTex, color: 0xffffff })
 );
 scene.add(sunMesh);
@@ -255,7 +255,7 @@ function glowSprite(r, g, b, s) {
   sp.scale.set(s, s, 1);
   return sp;
 }
-const sunGlow = glowSprite(255,235,160, 45);
+const sunGlow = glowSprite(255,235,160, 52);   // r130'de ~20° ye kil: diski sarar, gezegenleri yutmaz
 scene.add(sunGlow);
 
 // ═══════════ YARDIMCI DOKULAR (canvas) ═══════════
@@ -357,8 +357,8 @@ function güneşParlamalarGuncelle(dt) {
 // Ay, gokyuzu motoruyla GERCEK RA/Dec konumuna oturtulur (ephemeris.json).
 // Eskiden sabit noktada durup kamera-Dunya arasina girerek Dunya'yu perdeliyordu.
 const moon = new THREE.Mesh(
-  new THREE.SphereGeometry(0.85, 64, 32),   // gosterim boyutu gercekten buyuk: uzakta ~5px yerine ~35px gorunur
-  new THREE.MeshStandardMaterial({ map: NASA.moon, roughness: 1, metalness: 0 })
+  new THREE.SphereGeometry(0.95, 64, 32),   // gosterim: ~2.4° gorunen cap (gercenin ~5 kati;Gunese yakininca onu yutmayacak)
+  new THREE.MeshStandardMaterial({ map: NASA.moon, roughness: 1, metalness: 0, emissiveMap: NASA.moon, emissive: 0x1a1a22, emissiveIntensity: 0.55 })
 );
 moon.renderOrder = 2;
 scene.add(moon);   // gecici; skyGroup tanimlandiktan hemen sonra gok cercevesine tasinir
@@ -415,7 +415,7 @@ const sunDirWorld = new THREE.Vector3(0,0,1);
 function guneşUygula() {
   const { decl, sunLon } = güneşKonumu(simDate());
   lambdaV = hedefLambdaV; // saat kaydırması merkez boylamı değiştirmez
-  if (sunEdge && !flyAnim) lambdaV = sunLon - 32; // G modu: güneş ekran kenarında
+  if (sunEdge && !flyAnim) lambdaV = sunLon - 26; // G modu: gunes kadraj solunda; Dunya aydinlik yari gorunur
   earthGroup.rotation.y = -Math.PI/2 - RAD(lambdaV);
   const d = RAD(decl), L = RAD(sunLon - lambdaV);
   sunDirWorld.set(Math.sin(L)*Math.cos(d), Math.sin(d), Math.cos(L)*Math.cos(d)).normalize();
@@ -760,13 +760,13 @@ function buildEtiketler() {
 
 // ═══════════ GEZEGENLER (dokulu, JPL konumlu) ═══════════
 const PLANETLAR = [
-  { ad: 'Merkür', adEN: 'Mercury', dosya: 'mercury.jpg', yari: 0.09, anahtar: 'mer' },
-  { ad: 'Venüs',  adEN: 'Venus',   dosya: 'venus_surface.jpg', yari: 0.16, anahtar: 'ven' },
-  { ad: 'Mars',   adEN: 'Mars',    dosya: 'mars.jpg', yari: 0.13, anahtar: 'mar' },
-  { ad: 'Jüpiter',adEN: 'Jupiter', dosya: 'jupiter.jpg', yari: 0.55, anahtar: 'jup' },
-  { ad: 'Satürn', adEN: 'Saturn',  dosya: 'saturn.jpg', yari: 0.46, anahtar: 'sat', halka: true },
-  { ad: 'Uranüs', adEN: 'Uranus',  dosya: 'uranus.jpg', yari: 0.28, anahtar: 'ura' },
-  { ad: 'Neptün', adEN: 'Neptune', dosya: 'neptune.jpg', yari: 0.27, anahtar: 'nep' },
+  { ad: 'Merkür', adEN: 'Mercury', dosya: 'mercury.jpg', yari: 0.055, anahtar: 'mer' },
+  { ad: 'Venüs',  adEN: 'Venus',   dosya: 'venus_surface.jpg', yari: 0.075, anahtar: 'ven' },
+  { ad: 'Mars',   adEN: 'Mars',    dosya: 'mars.jpg', yari: 0.07, anahtar: 'mar' },
+  { ad: 'Jüpiter',adEN: 'Jupiter', dosya: 'jupiter.jpg', yari: 0.14, anahtar: 'jup' },
+  { ad: 'Satürn', adEN: 'Saturn',  dosya: 'saturn.jpg', yari: 0.12, anahtar: 'sat', halka: true },
+  { ad: 'Uranüs', adEN: 'Uranus',  dosya: 'uranus.jpg', yari: 0.085, anahtar: 'ura' },
+  { ad: 'Neptün', adEN: 'Neptune', dosya: 'neptune.jpg', yari: 0.08, anahtar: 'nep' },
 ];
 async function gezegenleriYukle() {
   for (const p of PLANETLAR) {
@@ -776,7 +776,7 @@ async function gezegenleriYukle() {
     // isim etiketi (cocuk) — 🏷️ katmaniyla acilip kapanir
     const ltx = kanvasEtiket(p.ad === 'Jüpiter' || p.ad === 'Satürn' ? '' : '', 30, '#ffe08a');
     const lsp = new THREE.Sprite(new THREE.SpriteMaterial({ map: kanvasEtiket(p.ad, 34, '#ffe08a'), transparent: true, opacity: .9, depthWrite: false }));
-    lsp.position.y = p.yari + 0.9; lsp.scale.set(6, 1.5, 1); lsp.userData.etiket = true;
+    lsp.position.y = p.yari + 0.22; lsp.scale.set(1.15, 0.29, 1);   // ~23 birimden ~40px: okunur, dev degil lsp.userData.etiket = true;
     m.add(lsp); m.userData.etiket = lsp;
     if (p.halka) {
       const htx = await new Promise(res => texLoader.load(D + 'saturn_ring.png', res, undefined, () => res(null)));
@@ -911,7 +911,7 @@ renderer.domElement.addEventListener('click', ev => {
       const v = new THREE.Vector3(starlinkNoktalar.userData.buf[h.i*3], starlinkNoktalar.userData.buf[h.i*3+1], starlinkNoktalar.userData.buf[h.i*3+2]);
       earthGroup.localToWorld(v); flyToTarget(v, 0.55);
     } else if (h.tur === 'gezegen') flyToTarget(worldPos(h.nesne), 1.2);
-    else if (h.tur === 'moon') flyToTarget(worldPos(moon), 1.3);
+    else if (h.tur === 'moon') flyToTarget(worldPos(moon), 4.6);
     return;
   }
   // 2) sehir noktasi → seyre yaklaş + hava karti
@@ -1201,7 +1201,7 @@ document.querySelectorAll('#panel .fly').forEach(el => el.onclick = (ev) => {
   ev.preventDefault(); ev.stopPropagation();   // label tıklaması katmanı açıp kapatmasın (📍 etiket İÇİNDE)
   if (flyAnim) return;
   const t = el.dataset.fly;
-  if (t === 'moon') flyToTarget(worldPos(moon), 1.8);
+  if (t === 'moon') flyToTarget(worldPos(moon), 4.6);   // ~12° gorunen disk; yeni ay fazinda iken de taninir
   else if (t === 'iss') { const p = issUygula(); flyTo(p.lat, p.lon, 1.9); }
   else if (t === 'starlink') {
     if (!starlinkNoktalar) return;
@@ -1246,7 +1246,7 @@ function animate() {
   skyGroup.rotation.y = RAD((GMST0 - gmstDeg(simDate())) % 360) - RAD(lambdaV);
   if (EPHEM) {
     const ayP = ephRA('moon', simDate());
-    if (ayP) moon.position.copy(skyDir(ayP.ra, ayP.dec, 15));   // r=15 + buyuk yari-cap: kadraja girince secilir (eskiden ~5px'ti)
+    if (ayP) moon.position.copy(skyDir(ayP.ra, ayP.dec, 46));   // r=46: ~2.4° gorunen cap — Yeni Ay civarinda Gunes'i kapatmaz
     gezegenGrubu.children.forEach(m => {
       const p = ephRA(m.userData.anahtar, simDate());
       if (p) m.position.copy(skyDir(p.ra, p.dec, 30));
