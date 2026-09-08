@@ -236,8 +236,7 @@ scene.add(atmos);
 // ═══════════ GÜNEŞ ═══════════
 const sunLight = new THREE.DirectionalLight(0xfff5e6, 2.6);
 scene.add(sunLight);
-scene.add(new THREE.AmbientLight(0x0a1020, 0.35));
-
+const ambientLight = new THREE.AmbientLight(0x0a1020, 0.35); scene.add(ambientLight);
 const sunTex = loader.load('dokular/sun.jpg'); sunTex.colorSpace = THREE.SRGBColorSpace;   // gercek Solar Dynamics görünümü (D sabiti henüz tanımsız — literal yol)
 const sunMesh = new THREE.Mesh(
   new THREE.SphereGeometry(8, 48, 24),   // gosterim olcegi: r130'da ekranda ~90px disk (G kadrajda iken)
@@ -364,6 +363,18 @@ const moon = new THREE.Mesh(
 );
 moon.renderOrder = 2;
 scene.add(moon);   // gecici; skyGroup tanimlandiktan hemen sonra gok cercevesine tasinir
+// Dunya/Ay yorunge-etiketleri (moon tanimlandiktan sonra — TDZ yok)
+// yorunge modu: Dunya ve Ay etiketleri (Dunya'nin kendi sprite'i yoktu)
+const dunyaEtiket = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: .95, depthWrite: false }));
+dunyaEtiket.scale.set(4.2, 1.05, 1); dunyaEtiket.visible = false;
+scene.add(dunyaEtiket);   // sahne duzeyi: her karede konum verilir
+const ayEtiket = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: .85, depthWrite: false }));
+ayEtiket.scale.set(4.6, 1.15, 1); ayEtiket.visible = false; scene.add(ayEtiket);
+function yorEtiketleri() {
+  const adD = LANG === 'en' ? 'Earth' : 'Dünya', adA = LANG === 'en' ? 'Moon' : 'Ay';
+  dunyaEtiket.material.map = kanvasEtiket(adD, 40, '#7ec8ff'); dunyaEtiket.material.needsUpdate = true;
+  ayEtiket.material.map = kanvasEtiket(adA, 30, '#cccccc'); ayEtiket.material.needsUpdate = true;
+}
 
 // ═══════════ ISS ═══════════
 const issDot = new THREE.Group();
@@ -1341,6 +1352,8 @@ function solarGuncelle(t) {
   const am = 2 * Math.PI * gun / 27.32;
   moon.position.set(earthGroup.position.x + Math.sin(am) * 6, Math.sin(am) * 0.5, earthGroup.position.z + Math.cos(am) * 6);
   // Gezegenler: gerçek periyotlarla Güneş'in etrafında
+  dunyaEtiket.position.set(earthGroup.position.x, 3.2, earthGroup.position.z);
+  ayEtiket.position.set(moon.position.x, moon.position.y + 2.6, moon.position.z);
   gezegenGrubu.children.forEach(m => {
     const y = YOR[m.userData.anahtar]; if (!y) return;
     const a = RAD(y.L0) + 2 * Math.PI * gun / y.T;
@@ -1359,18 +1372,32 @@ function orbitAyarla(on) {
     issDot.visible = issOrbit.visible = false;
     if (starlinkNoktalar) starlinkNoktalar.visible = false;
     yorHalkalar.children.forEach(l => l.material.opacity = 0.65);
-    gezegenGrubu.children.forEach(m => { const e = m.userData.etiket; if (e) { e.scale.set(4.2, 1.05, 1); e.visible = $('Llabels').checked; } });
+    $('Llabels').checked = true;                                  // halkada kim-var-gorunsun
+    gezegenGrubu.children.forEach(m => m.userData._olcekYok = true);   // isaret: modda buyuk gosterim
+    gezegenGrubu.children.forEach(m => { m.scale.setScalar(2.4); const e = m.userData.etiket; if (e) { e.scale.set(3.4, 0.85, 1); e.visible = true; } });
     controls.maxDistance = 420; controls.target.set(0, 0, 0); camera.position.set(0, 95, 150);
     if (speedX < 3600) { while (hizIdx < HIZLAR.length - 1 && HIZLAR[hizIdx] < 3600) hizIdx++; speedX = HIZLAR[hizIdx]; $('tspeed').textContent = '×' + speedX; $('tspeed').classList.add('on'); }
     playing = true; $('tpause').textContent = '⏸';
+    // gezegenler ve Ay skyGroup COCUUGU; kubbe gizlenince onlar da kaybolurdu → sahneye tasi
+    skyGroup.remove(gezegenGrubu); scene.add(gezegenGrubu);
+    skyGroup.remove(moon); scene.add(moon);
+    earthMat.emissiveIntensity = 0.15;   // sehir isiltilarinin kahve pariltisi sistem golgesini bozmasin
+    moon.scale.setScalar(0.27);          // gercek boyut orani: Ay = Dünya'nin ~1/4'ü → ayrik gorunur
+    yorEtiketleri(); dunyaEtiket.visible = ayEtiket.visible = $('Llabels').checked;
+    ambientLight.intensity = 0.9;        // gece tarafi da seçilsin (gri leke olmasin)
     skyGroup.visible = false;   // gok kubbesi/yildizlar sistem olceginde dev gursultu
   } else {
     earthGroup.position.set(0, 0, 0); earthGroup.rotation.set(0, 0, 0);
     sunMesh.scale.setScalar(1); sunGlow.scale.set(52, 52, 1);   // eski gosterim olcegi geri
     yorHalkalar.children.forEach(l => l.material.opacity = 0.4);
-    gezegenGrubu.children.forEach(m => { const e = m.userData.etiket; if (e) e.scale.set(1.15, 0.29, 1); });
+    gezegenGrubu.children.forEach(m => { m.scale.setScalar(1); const e = m.userData.etiket; if (e) e.scale.set(1.15, 0.29, 1); });
     controls.maxDistance = 30; controls.target.set(0, 0, 0); camera.position.set(0, 0, 4.2);
     skyGroup.visible = true;
+    scene.remove(gezegenGrubu); skyGroup.add(gezegenGrubu);   // gok cercevesine geri
+    scene.remove(moon); skyGroup.add(moon);
+    earthMat.emissiveIntensity = 1.4;
+    moon.scale.setScalar(1); ambientLight.intensity = 0.35;   // yakın çekim olcekleri geri
+    dunyaEtiket.visible = ayEtiket.visible = false;
     katmanSenkron(); guneşUygula();
   }
 }
